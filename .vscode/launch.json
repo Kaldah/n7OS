@@ -1,0 +1,17 @@
+{
+    "type":"gdb",
+    "request":"attach",
+    "name":"Attachtogdbserver",
+    "executable":"${workspaceRoot}/kernel.bin",
+    "target":":1234",
+    "remote":true,
+    "cwd":"${workspaceRoot}",
+    "debugger_args":["−i=mi"],
+    "valuesFormatting":"parseText",
+    "autorun":[
+        "dirkernel",
+        "dirboot",
+        "dirbin",
+        "dirlib"
+    ],
+}

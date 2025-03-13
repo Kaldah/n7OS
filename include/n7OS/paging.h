@@ -7,13 +7,42 @@
 
 #include <inttypes.h>
 
+#define PRESENT 0x1
+#define WRITE 0x2
+#define USER 0x4
+#define RESERVED1 0x8
+#define ACCESSED 0x20
+#define DIRTY 0x40
+#define RESERVED2 0x80
+#define AVAILABLE 0x200
+#define PAGE 0x1000
+
 /**
  * @brief Description d'une ligne de la table de page
  * 
  */
 typedef struct {
-    // a completer
+
+    uint8_t P:1; // Present
+    uint8_t W:1; // Read/Write
+    uint8_t U:1; // User or Kernel mode
+    uint8_t RSVD1:2; // Reserved
+    uint8_t A:1; // Accessed
+    uint8_t D:1; // Dirty
+    uint8_t RSVD2:2; // Reserved
+    uint8_t available:3;
+    uint32_t page:20;
+
 } page_table_entry_t;
+
+
+typedef struct {
+    uint8_t P:1; // Present
+    uint8_t W:1; // Read/Write
+    uint8_t U:1; // User/Supervisor
+    uint16_t RSVD:9; // Reserved
+    uint32_t page_table:20;
+} page_directory_entry_t;
 
 /**
  * @brief Une entrée dans la table de page peut être manipulée en utilisant
@@ -24,11 +53,27 @@ typedef union {
     uint32_t value;
 } PTE; // PTE = Page Table Entry 
 
+
+/**
+ * @brief Une entrée dans le répertoire de page peut être manipulée en utilisant
+ *        la structure page_directory_entry_t ou directement la valeur
+ */
+typedef union {
+    page_directory_entry_t page_entry;
+    uint32_t value;
+} PDE; // PDE = Page Directory Entry 
+
 /**
  * @brief Une table de page (PageTable) est un tableau de descripteurs de page
  * 
  */
 typedef PTE * PageTable;
+
+/**
+ * @brief Un répertoire de page (PageDirectory) est un tableau de descripteurs de table de page
+ * 
+ */
+typedef PDE * PageDirectory;
 
 /**
  * @brief Cette fonction initialise le répertoire de page, alloue les pages de table du noyau

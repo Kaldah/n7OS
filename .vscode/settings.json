@@ -1,0 +1,17 @@
+{
+    "files.associations": {
+        "console.h": "c",
+        "random": "c",
+        "array": "c",
+        "bitset": "c",
+        "string_view": "c",
+        "format": "c",
+        "initializer_list": "c",
+        "span": "c",
+        "mem.h": "c",
+        "cstdint": "c",
+        "paging.h": "c",
+        "cpu.h": "c",
+        "stddef.h": "c"
+    }
+}

@@ -13,7 +13,10 @@
  * 
  * On considère ici une mémoire de 16Mo
  */
-#define LAST_MEMORY_INDEX 0XFFFFFF 
+#define LAST_MEMORY_INDEX 0XFFFFFF // 16Mo
+#define PAGE_NUMBER 0x1000 // 4096 pages
+#define PAGES_TABLE_SIZE 0x80 // 128 
+
 
 /**
  * @brief Taille d'une page en mémoire

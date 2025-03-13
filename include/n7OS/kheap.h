@@ -29,7 +29,6 @@ uint32_t kmalloc_a(uint32_t sz);
  * @brief Alloue une zone mémoire de taille sz, le résultat sera fourni dans phys.
  * 
  * @param sz        Taille de la zone mémoire à allouer
- * @param phys      Adresse de début de la zone allouée. Doit être un pointeur valide de type uint32_t
  * @return uint32_t Adresse de début de la zone allouée
  */
 uint32_t kmalloc_p(uint32_t sz, uint32_t *phys);

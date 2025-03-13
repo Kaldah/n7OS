@@ -5,6 +5,7 @@
 
 #define VGA_WIDTH 80
 #define VGA_HEIGHT 25
+#define VGA_SIZE VGA_WIDTH * VGA_HEIGHT
 
 #define SCREEN_ADDR 0xB8000
 
@@ -34,8 +35,8 @@
 // Character color: blink|back|text
 #define BLINK   0<<7
 #define BACK    BLACK<<4
-#define TEXT    WHITE 
-#define CHAR_COLOR BLINK|BACK|TEXT
+#define TEXT    L_GREEN
+#define CHAR_COLOR (BLINK|BACK|TEXT)
 
 void init_console();
 
