@@ -36,14 +36,6 @@ typedef struct {
 } page_table_entry_t;
 
 
-typedef struct {
-    uint8_t P:1; // Present
-    uint8_t W:1; // Read/Write
-    uint8_t U:1; // User/Supervisor
-    uint16_t RSVD:9; // Reserved
-    uint32_t page_table:20;
-} page_directory_entry_t;
-
 /**
  * @brief Une entrée dans la table de page peut être manipulée en utilisant
  *        la structure page_table_entry_t ou directement la valeur
@@ -53,6 +45,23 @@ typedef union {
     uint32_t value;
 } PTE; // PTE = Page Table Entry 
 
+/**
+ * @brief Une table de page (PageTable) est un tableau de descripteurs de page
+ * 
+ */
+typedef PTE * PageTable;
+
+/**
+ * @brief Description d'une entrée dans le répertoire de page
+ * 
+ */
+typedef struct {
+    uint8_t P:1; // Present
+    uint8_t W:1; // Read/Write
+    uint8_t U:1; // User/Supervisor
+    uint16_t RSVD:9; // Reserved
+    uint32_t page_table:20;
+} page_directory_entry_t;
 
 /**
  * @brief Une entrée dans le répertoire de page peut être manipulée en utilisant
@@ -63,11 +72,6 @@ typedef union {
     uint32_t value;
 } PDE; // PDE = Page Directory Entry 
 
-/**
- * @brief Une table de page (PageTable) est un tableau de descripteurs de page
- * 
- */
-typedef PTE * PageTable;
 
 /**
  * @brief Un répertoire de page (PageDirectory) est un tableau de descripteurs de table de page
