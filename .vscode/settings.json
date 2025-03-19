@@ -12,6 +12,11 @@
         "cstdint": "c",
         "paging.h": "c",
         "cpu.h": "c",
-        "stddef.h": "c"
+        "stddef.h": "c",
+        "chrono": "c",
+        "variant": "c",
+        "*.tcc": "c",
+        "string.h": "c",
+        "inttypes.h": "c"
     }
 }

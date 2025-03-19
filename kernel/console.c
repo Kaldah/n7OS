@@ -1,5 +1,6 @@
 #include  <n7OS/console.h>
 #include  <n7OS/cpu.h>
+#include <string.h>
 
 #define BLINK   0<<7
 #define BACK    BLACK<<4

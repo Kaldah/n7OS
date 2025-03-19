@@ -14,8 +14,10 @@
  * On considère ici une mémoire de 16Mo
  */
 #define LAST_MEMORY_INDEX 0XFFFFFF // 16Mo
-#define PAGE_NUMBER 0x1000 // 4096 pages
-#define PAGES_TABLE_SIZE 0x80 // 128 
+#define BIT_MAP_SIZE 0x80 // 128 
+#define PAGE_NUMBER (LAST_MEMORY_INDEX + 1) / PAGE_SIZE
+
+#define MEMORY_32_BITS_LENGTH (LAST_MEMORY_INDEX +1) >> 5 // La taille de la mémoire divisée par 32
 
 
 /**
@@ -60,5 +62,6 @@ void init_mem();
  * @brief Affiche l'état de la mémoire physique
  * 
  */
-void print_mem();
+void print_mem(uint32_t nb_pages);
+
 #endif

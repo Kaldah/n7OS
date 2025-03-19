@@ -16,6 +16,7 @@
 #define RESERVED2 0x80
 #define AVAILABLE 0x200
 #define PAGE 0x1000
+#define TABLE_NUMBER 1024
 
 /**
  * @brief Description d'une ligne de la table de page
@@ -24,7 +25,7 @@
 typedef struct {
 
     uint8_t P:1; // Present
-    uint8_t W:1; // Read/Write
+    uint8_t RW:1; // Read/Write
     uint8_t U:1; // User or Kernel mode
     uint8_t RSVD1:2; // Reserved
     uint8_t A:1; // Accessed
@@ -46,7 +47,7 @@ typedef union {
 } PTE; // PTE = Page Table Entry 
 
 /**
- * @brief Une table de page (PageTable) est un tableau de descripteurs de page
+ * @brief Une table de page (PageTable) est un tableau d'entrée de table de page
  * 
  */
 typedef PTE * PageTable;
@@ -57,7 +58,7 @@ typedef PTE * PageTable;
  */
 typedef struct {
     uint8_t P:1; // Present
-    uint8_t W:1; // Read/Write
+    uint8_t RW:1; // Read/Write
     uint8_t U:1; // User/Supervisor
     uint16_t RSVD:9; // Reserved
     uint32_t page_table:20;
@@ -84,7 +85,7 @@ typedef PDE * PageDirectory;
  *        et active la pagination
  * 
  */
-void initialise_paging();
+PageDirectory initialise_paging();
 
 /**
  * @brief Cette fonction alloue une page de la mémoire physique à une adresse de la mémoire virtuelle

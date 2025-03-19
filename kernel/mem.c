@@ -1,4 +1,8 @@
 #include <n7OS/mem.h>
+#include <stdio.h>
+#include <stdbool.h> 
+#include <stddef.h>
+#include <string.h> // Include for memset
 
 uint32_t *free_page_bitmap_table;
 
@@ -7,17 +11,18 @@ uint32_t *free_page_bitmap_table;
  * 
  * Lorsque la page a été choisie, cette fonction permet de la marquer allouée
  * 
- * @param addr Adresse de la page à allouer
+ * @param adresse Adresse de la page à allouer
  */
-void setPage(uint32_t addr) {
+void setPage(uint32_t adresse) {
+    uint32_t index_global = adresse / PAGE_SIZE;
 
-    // On divise l'adresse par 32 pour obtenir l'index de la page
-    uint32_t page_index = addr / 32;
+    // On divise l'index_global par 32 pour obtenir l'index de la page
+    uint32_t page_index = index_global / 32;
     // On récupère l'emplacement du bit de l'adresse
-    uint8_t bit_index = addr % 32;
+    uint8_t bit_index = index_global % 32;
 
     // On vérifie que la page n'est pas déjà allouée
-    if (free_page_bitmap_table[page_index] & (1 << bit_index)) {
+    if (free_page_bitmap_table[page_index] & (0x1 << bit_index)) {
         printf("Page already allocated\n");
         return;
     }
@@ -31,13 +36,14 @@ void setPage(uint32_t addr) {
  * 
  * Libère la page allouée.
  * 
- * @param addr Adresse de la page à libérer
+ * @param adresse Adresse de la page à libérer
  */
-void clearPage(uint32_t addr) {
-     // On divise l'adresse par 32 pour obtenir l'index de la page
-    uint32_t page_index = addr / 32;
+void clearPage(uint32_t adresse) {
+    uint32_t index_global = adresse / PAGE_SIZE;
+    // On divise l'adresse par 32 pour obtenir l'index de la page
+    uint32_t page_index = index_global / 32;
     // On récupère l'emplacement du bit de l'adresse
-    uint8_t bit_index = addr % 32;
+    uint8_t bit_index = index_global % 32;
 
     // On libère la page : ~ = NOT, pour inverser les bits
     free_page_bitmap_table[page_index] = free_page_bitmap_table[page_index] & (~(1 << bit_index));
@@ -49,19 +55,20 @@ void clearPage(uint32_t addr) {
  * @return uint32_t Adresse de la page sélectionnée
  */
 uint32_t findfreePage() {
-    uint32_t adresse = 0x0;
+    uint32_t adresse = -1;
+    bool found = false;
 
-    for (int i = 0; i < PAGES_TABLE_SIZE; i++) {
+    for (int i = 0; i < BIT_MAP_SIZE && !found; i++) {
         if (free_page_bitmap_table[i] != 0xFFFFFFFF) {
-            for (int j = 0; j < 32  ; j++) {
-                if ((free_page_bitmap_table[i] & (1 << j)) == 0) {
-                    adresse = i * 32 + j;
+            for (int j = 0; j < 32 && !found; j++) {
+                uint32_t bit = 0x1 << j;
+                if (!(free_page_bitmap_table[i] & bit)) {
+                    adresse = (i * 32 + j) * PAGE_SIZE;
                     // On marque la page comme allouée
                     setPage(adresse);
-                    break;
+                    found = true;
                 }
             }
-            break;
         }
     }
 
@@ -73,11 +80,12 @@ uint32_t findfreePage() {
  * 
  */
 void init_mem() {
-    free_page_bitmap_table[PAGES_TABLE_SIZE];
-
-    for (int i = 0; i < PAGES_TABLE_SIZE; i++) {
-        free_page_bitmap_table[i] = 0x0;
+    free_page_bitmap_table = (uint32_t *) kmalloc_a(BIT_MAP_SIZE * sizeof(uint32_t));
+    if (free_page_bitmap_table == NULL) {
+        printf("Error: Failed to allocate memory for free_page_bitmap_table.\n");
+        return;
     }
+    memset(free_page_bitmap_table, 0, sizeof(uint32_t) * BIT_MAP_SIZE);
 }
 
 /**
@@ -85,11 +93,35 @@ void init_mem() {
  * 
  */
 void print_mem(uint32_t nb_pages) {
-    for (int i = 0; i < nb_pages; i++) {
-        printf("Page %d : ", i);
-        // Affiche 1 si la page est allouée, 0 sinon
-        printf("%x\n", free_page_bitmap_table[i]);
-        printf("\n");
+
+    uint32_t nb_cases_affichee = (nb_pages / 32);
+    uint32_t nb_pages_allocated = 0;
+
+    // Check if nb_cases_affichee is within valid range
+    if (nb_cases_affichee > BIT_MAP_SIZE) {
+        nb_cases_affichee = BIT_MAP_SIZE;
     }
-    
+
+    if (free_page_bitmap_table == NULL) {
+        printf("Error: free_page_bitmap_table has not been initialized.\n");
+        return;
+    }
+
+    printf("Affichage des %d premières pages\n", nb_cases_affichee * 32);
+    for (uint32_t i = 0; i < nb_cases_affichee; i++) {
+        printf("Pages %d à %d\n", i * 32, (i + 1) * 32 - 1);
+        for (int j = 0; j < 32; j++) {
+            if (free_page_bitmap_table[i] & (0x1 << j)) {
+                printf("1 ");
+            } else {
+                printf("0 ");
+            }
+        }
+        for (int j = 0; j < 32; j++) {
+            if (free_page_bitmap_table[i] & (0x1 << j)) {
+                nb_pages_allocated++;
+            }
+        }
+    }
+    printf("Nombre de pages allouées : %d\n", nb_pages_allocated);
 }
