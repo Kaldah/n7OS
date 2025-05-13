@@ -46,4 +46,6 @@ void init_console();
  */
 void console_putbytes(const char *s, int len);
 
+void console_puts_time(const char *s);
+
 #endif

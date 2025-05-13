@@ -53,45 +53,45 @@
 
 
 /*
- * This is the function called by printf to send its output to the screen. You
+ * This is the function called by printfk to send its output to the screen. You
  * have to implement it in the kernel.
  */
 extern void console_putbytes(const char *s, int len);
 
-/* This version of printf is implemented in terms of putchar and puts.  */
+/* This version of printfk is implemented in terms of putchark and putsk.  */
 
-#define	PRINTF_BUFMAX	128
+#define	printfk_BUFMAX	128
 
-struct printf_state {
-	char buf[PRINTF_BUFMAX];
+struct printfk_state {
+	char buf[printfk_BUFMAX];
 	unsigned int index;
 };
 
 static void
-flush(struct printf_state *state)
+flush(struct printfk_state *state)
 {
 	/*
 	 * It would be nice to call write(1,) here, but if fd_set_console
 	 * has not been called, it will break.
 	 */
 	
-	write((const char *)state->buf, state->index);
+	console_putbytes((const char *)state->buf, state->index);
 
 	state->index = 0;
 }
 
 static void
-printf_char(arg, c)
+printfk_char(arg, c)
 	char *arg;
 	int c;
 {
-	struct printf_state *state = (struct printf_state *) arg;
+	struct printfk_state *state = (struct printfk_state *) arg;
 
-	if ((c == 0) || (c == '\n') || (state->index >= PRINTF_BUFMAX))
+	if ((c == 0) || (c == '\n') || (state->index >= printfk_BUFMAX))
 	{
 		flush(state);
 		state->buf[0] = c;
-		write((const char *)state->buf, 1);
+		console_putbytes((const char *)state->buf, 1);
 	}
 	else
 	{
@@ -103,12 +103,12 @@ printf_char(arg, c)
 /*
  * Printing (to console)
  */
-int vprintf(const char *fmt, va_list args)
+int vprintfk(const char *fmt, va_list args)
 {
-	struct printf_state state;
+	struct printfk_state state;
 
 	state.index = 0;
-	_doprnt(fmt, args, 0, (void (*)())printf_char, (char *) &state);
+	_doprnt(fmt, args, 0, (void (*)())printfk_char, (char *) &state);
 
 	if (state.index != 0)
 	    flush(&state);
@@ -119,30 +119,30 @@ int vprintf(const char *fmt, va_list args)
 }
 
 int
-printf(const char *fmt, ...)
+printfk(const char *fmt, ...)
 {
 	va_list	args;
 	int err;
 
 	va_start(args, fmt);
-	err = vprintf(fmt, args);
+	err = vprintfk(fmt, args);
 	va_end(args);
 
 	return err;
 }
 
-int putchar(int c)
+int putchark(int c)
 {
 	char ch = c;
-	write(&ch, 1);
+	console_putbytes(&ch, 1);
         return (unsigned char)ch;
 }
 
-int puts(const char *s)
+int putsk(const char *s)
 {
         while (*s) {
-                putchar(*s++);
+                putchark(*s++);
         }
-	putchar('\n');
+	putchark('\n');
         return 0;
 }

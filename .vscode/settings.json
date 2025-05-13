@@ -17,6 +17,15 @@
         "variant": "c",
         "*.tcc": "c",
         "string.h": "c",
-        "inttypes.h": "c"
+        "inttypes.h": "c",
+        "kheap.h": "c",
+        "processor_structs.h": "c",
+        "syscall_defs.h": "c",
+        "start.h": "c",
+        "irq.h": "c",
+        "stdio.h": "c",
+        "time.h": "c",
+        "stdint.h": "c",
+        "sys.h": "c"
     }
 }

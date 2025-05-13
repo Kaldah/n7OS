@@ -24,14 +24,14 @@
  */
 typedef struct {
 
-    uint8_t P:1; // Present
-    uint8_t RW:1; // Read/Write
-    uint8_t U:1; // User or Kernel mode
-    uint8_t RSVD1:2; // Reserved
-    uint8_t A:1; // Accessed
-    uint8_t D:1; // Dirty
-    uint8_t RSVD2:2; // Reserved
-    uint8_t available:3;
+    uint32_t P:1; // Present
+    uint32_t RW:1; // Read/Write
+    uint32_t U:1; // User or Kernel mode
+    uint32_t RSVD1:2; // Reserved
+    uint32_t A:1; // Accessed
+    uint32_t D:1; // Dirty
+    uint32_t RSVD2:2; // Reserved
+    uint32_t available:3;
     uint32_t page:20;
 
 } page_table_entry_t;
@@ -57,10 +57,10 @@ typedef PTE * PageTable;
  * 
  */
 typedef struct {
-    uint8_t P:1; // Present
-    uint8_t RW:1; // Read/Write
-    uint8_t U:1; // User/Supervisor
-    uint16_t RSVD:9; // Reserved
+    uint32_t P:1; // Present
+    uint32_t RW:1; // Read/Write
+    uint32_t U:1; // User/Supervisor
+    uint32_t RSVD:9; // Reserved
     uint32_t page_table:20;
 } page_directory_entry_t;
 

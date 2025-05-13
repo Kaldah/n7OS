@@ -3,4 +3,6 @@
 
 void init_syscall();
 
+typedef void* (*fnptr)(); // Type pour le pointeur de fonction
+
 #endif

@@ -13,10 +13,15 @@
 #define LSB_CMD 0xF
 #define MSB_CMD 0xE
 
+
+// Position de l'heure
+#define TIME_START_POSITION (VGA_WIDTH - 11) // 11 caractères pour " | 00:00:00"
+
 uint16_t *scr_tab;
 
 void init_console() {
     scr_tab= (uint16_t *) SCREEN_ADDR;
+    printfk("\f");
 }
 
 // get the cursor position from memory
@@ -63,28 +68,30 @@ void set_mem_cursor(uint16_t cursor_pos) {
 }
 
 void console_putchar(const char c) {
-
     uint16_t cursor_pos = get_mem_cursor();
 
-    
+    // Vérification des emplacements interdits (" | 00:00:00")
+    if (cursor_pos >= TIME_START_POSITION && cursor_pos < VGA_WIDTH) {
+        cursor_pos = VGA_WIDTH; // Passer à la ligne suivante
+    }
 
     if (c >= 32 && c <= 126) {
-        scr_tab[cursor_pos]= CHAR_COLOR<<8|c;
+        scr_tab[cursor_pos] = CHAR_COLOR << 8 | c;
         cursor_pos++;
 
     } else if (c == '\n') {
-        // New line
+        // Nouvelle ligne
         cursor_pos = cursor_pos + VGA_WIDTH - cursor_pos % VGA_WIDTH;
 
     } else if (c == '\f') {
-        // Clear the screen
+        // Effacer l'écran
         for (int i = 0; i < VGA_SIZE; i++) {
             scr_tab[i] = CHAR_COLOR << 8 | ' ';
         }
         cursor_pos = 0;
 
     } else if (c == '\b') {
-        // Backspace
+        // Retour arrière
         cursor_pos--;
 
     } else if (c == '\t') {
@@ -93,10 +100,10 @@ void console_putchar(const char c) {
     } else if (c == '\r') {
         cursor_pos = cursor_pos - (cursor_pos % VGA_WIDTH);
     }
-    // Check if the cursor will be out of the screen
+    // Vérifier si le curseur est hors de l'écran
     check_screen(&cursor_pos);
 
-    // Set the cursor to the new position after the character has been printed
+    // Mettre à jour la position du curseur en mémoire
     set_mem_cursor(cursor_pos);
 }
 
@@ -118,4 +125,16 @@ void console_putbytes(const char *s, int len) {
     scr_tab[cursor_pos]= (1 << 7|BACK|TEXT) << 8 | (scr_tab[cursor_pos] & 0x00FF);
     
     set_mem_cursor(cursor_pos);
+}
+
+void console_puts_time(const char *s) {
+
+    // Ajout de " | " devant le temps s
+    char formatted_time[12] = " | ";
+    strncat(formatted_time, s, 9); // Concaténer le temps après " | "
+
+    // Écriture directe dans la zone réservée pour l'heure
+    for (int i = 0; i < 11; i++) {
+        scr_tab[TIME_START_POSITION + i] = CHAR_COLOR << 8 | formatted_time[i];
+    }
 }

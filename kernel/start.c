@@ -7,41 +7,63 @@
 #include <n7OS/mem.h>
 #include <n7OS/paging.h>
 #include <n7OS/kheap.h>
+#include <n7OS/irq.h>
+#include <n7OS/time.h>
+#include <n7OS/sys.h>
+#include <unistd.h>
+
 
 void kernel_start(void)
 {
     init_console();
-    //setup_base(0 /* la memoire virtuelle n'est pas encore definie */);
 
-    extern PageDirectory page_directory;
-    setup_base((uint32_t)&page_directory);
-    //setup_base(0);
+    // printf("===Initialisation de la mémoire===\n");
+
+    kmalloc_init();
+
+    // printf("===Initialisation de la pagination===\n");
+    uint32_t page_directory = (uint32_t) initialise_paging();
+    
+    setup_base(page_directory);
+    // print_mem(4096);
+
+    // Test de la pagination
+    alloc_page_entry(0xA0000000, 0, 0);
+    uint32_t *test = (uint32_t *) 0xA0000000;
+    uint32_t do_page_fault = *test;
+    do_page_fault ++;
+    
+    // Initialisation des appels systèmes
+    init_syscall();
+
+    // initialisation de l'horloge
+    init_time();
 
     // lancement des interruptions
     sti();
 
-    // affichage d'un caractere
-    printf("\f");
-    printf("===Initialisation de la mémoire===\n");
 
-    kmalloc_init();
+    // // Exemple d'envoie d'une interruption 50
+    // __asm__ volatile("int $50");
 
-     // init_mem();
-    // uint32_t page = findfreePage();
-    // printf("Page allouée : %x\n", page);
-    // page = findfreePage();
-    // printf("Page allouée : %x\n", page);
-    // printf("\n");
-    // printf(findfreePage());
-    // printf("\n");
+    // affichage de la console
 
-    printf("===Initialisation de la pagination===\n");
-    initialise_paging();
-    //alloc_page_entry(0x1000, 1, 1);
+    // On affiche le temps 0
+    console_puts_time("00:00:00");
+    
+    // affichage d'une chaine de caracteres
+    printf("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
 
-    printf("Test de la pagination\n");
-    //print_mem(4096);
-    printf("Autres tests\n");
+    if (example() == 1) {
+        printf ("Appel systeme example ok\n");
+    }
+
+    if (shutdown(2) == -1) {
+        printf ("Appel systeme shutdown ok\n");
+    }
+    else {
+        printf ("Appel systeme shutdown ko\n");
+    }
 
     // on ne doit jamais sortir de kernel_start
     while (1) {
