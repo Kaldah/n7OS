@@ -26,29 +26,34 @@ typedef RESOURCE_ID * RESOURCES_LIST; // Type pour la liste des ressources d'un 
 /**
  * @brief Structure pour stocker les registres de la pile d'un processus
  */
-typedef struct {
-    uint32_t ebp; // Base pointer
-    uint32_t esp; // Stack pointer
-    uint32_t eip; // Instruction pointer
-    uint32_t eflags; // Flags register
-} stack_t;
+typedef union {
+    struct {
+        uint32_t ebx; // Base index
+        uint32_t esp; // Stack pointer
+        uint32_t ebp; // Base pointer
+        uint32_t esi; // Source index
+        uint32_t edi; // Destination index
+    } s;
+    uint32_t regs[5]; // Array access to the registers
+} stack_context_t;
 
 /**
  * @brief Structure de données pour un processus
  * 
  */
 struct process_t {
-    void* stack;  // Pointeur vers la pile du processus
-    stack_t context; // Contexte d'exécution du processus
-    PROCESS_STATE state; // État du processus
+    char *name; // Nom du processus
     pid_t pid; // Identifiant du processus
     pid_t ppid; // Identifiant du processus parent
-    RESOURCES_LIST resources; // Liste des ressources utilisées par le processus
+    PROCESS_STATE state; // État du processus
     uint32_t priority; // Priorité du processus
+    void* stack;  // Pointeur vers la pile du processus
+    stack_context_t context; // Contexte d'exécution du processus
+    RESOURCES_LIST resources; // Liste des ressources utilisées par le processus
 };
 
 /* Gestion de la création et de la destruction des processus : */
-pid_t create(); /* Crée un nouveau processus */
+pid_t create(void * program, char *name); /* Crée un nouveau processus */
 
 void activer(pid_t pid); /* Active un processus suspendu */
 

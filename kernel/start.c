@@ -11,6 +11,24 @@
 #include <n7OS/time.h>
 #include <n7OS/sys.h>
 #include <unistd.h>
+#include <n7OS/processus.h>
+
+extern void processus1();
+
+void idle() {
+
+    // code de idle
+    printf("Idle process\n");
+    pid_t pid_proc1 = create(processus1, "Processus 1");
+    activer(pid_proc1); // on active le processus 1 
+    schedule();
+
+    for (int i = 0; i < 3; i++) {
+        printf("Idle goes brr\n");
+
+        arreter(); // cette fonction arrête le processeur élu
+    }
+}
 
 
 void kernel_start(void)
@@ -65,9 +83,16 @@ void kernel_start(void)
         printf ("Appel systeme shutdown ko\n");
     }
 
+    pid_t pidmain = create(idle, "Idle process");
+    // on active le processus idle
+
+    activer(pidmain); // on active le processus idle
+    // On lance idle
+    idle();
+
     // on ne doit jamais sortir de kernel_start
     while (1) {
-        // cette fonction arrete le processeur
+        // cette fonction arrête le processeur
         hlt();
     }
 }
