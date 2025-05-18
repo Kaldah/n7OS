@@ -8,18 +8,16 @@
 void terminer(pid_t pid);
 
 void processus1() {
+  sti(); // Active les interruptions
+
   pid_t pid = getpid(); // Récupère le PID du processus
   printf("Hello, world from P1 (PID=%d)\n", pid);
   
   while (1) {
-    // printf("Processus 1 ========================================\n");
-
-    while (get_time() % 5000 != 0) {
-      printf("Processus 1 : PID=%d, Time=%u\n", pid, get_time());
-      // Attendre jusqu'à la prochaine seconde
+    printf("Processus 1 ========================================\n");
+    while (get_time() % TIME_SLOT/2 != 0) {
       hlt();
     }
-    arreter(); // Arrête le processus
   }
 
   terminer(pid); // Termine le processus

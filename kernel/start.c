@@ -12,32 +12,24 @@
 #include <n7OS/sys.h>
 #include <unistd.h>
 #include <n7OS/processus.h>
-#include <stdlib.h> // Add for shutdown function
+#include <stdlib.h>
+#include <stdbool.h>
 
 extern void processus1();
 
-// Forward declaration of functions used in this file
-void display_scheduler_state(void);
-void terminer(pid_t pid);
-
 void idle() {
+    extern void handle_scheduling_IT();
     // code de idle
     printf("Idle process started\n");
     schedule();
+
     // On ne doit jamais sortir de idle
     while (1) {
-        printf("===============================Idle process time : %u\n", get_time());
-        display_scheduler_state();
-
-        while (get_time() % 5000 != 0) {
-            // Attendre jusqu'à la prochaine seconde
+        printf("Idle process running...\n");
+        // display_scheduler_state();
+        while (get_time() % TIME_SLOT/2 != 0) {
             hlt();
         }
-
-        arreter(); // Arrête le processus
-        // Using hlt() instead of arreter() to prevent system overload
-        // This pauses the CPU until the next interrupt
-        // hlt();
     }
     // Ne doit jamais sortir de idle
     terminer(getpid()); // Termine le processus
@@ -89,8 +81,5 @@ void kernel_start(void)
     idle();
 
     // This should never be reached
-    while (1) {
-        hlt();
-    }
-    // shutdown(0); // On ne doit jamais sortir de idle
+    shutdown(0);
 }

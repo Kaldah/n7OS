@@ -1,7 +1,7 @@
 #include <n7OS/processus.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <n7OS/printk.h> // Add for printfk function
+#include <n7OS/printk.h> // Add for // printfk function
 #include <unistd.h>
 
 // Define static arrays for all process components
@@ -20,6 +20,7 @@ uint32_t nb_ready_active_process; // Nombre de processus prets
 // vers les processus bloques sur une ressource pour le moment
 struct process_t *blocked_process[NB_PROC]; // File d'attente des processus bloques
 struct process_t *current_process = NULL; // Pointeur vers le processus en cours d'execution
+uint32_t current_process_duration = 0; // Durée d'execution du processus en cours
 
 bool schedule_locked = false; // Variable pour verifier si le planificateur est verrouille
 
@@ -74,7 +75,7 @@ pid_t create(void * program, char * name) {
     pid_t pid;
     
     if ((pid = Allouer_Pid()) == (pid_t)-1) {
-        printfk("Cannot create new process\n");
+        // printfk("Cannot create new process\n");
         shutdown(1); // Shutdown if no PID available
     }
     
@@ -202,7 +203,7 @@ void removeProcess(pid_t pid) {
             nb_ready_active_process--; // Decrement the count of ready processes
         }
     } else {
-        printfk("Processus %d non trouve dans la file d'attente\n", pid);
+        // printfk("Processus %d non trouve dans la file d'attente\n", pid);
     }
 }
 
@@ -214,12 +215,11 @@ void schedule() {
     // Met a jour l'etat des processus et la file d'attente
 
     schedule_locked = true; // Verrouille le planificateur pour eviter les interruptions
-    printf("===Planificateur de processus===\n");
     
     // On verifie si la file d'attente des processus prets est vide
     if (ready_active_process[0] == NULL) {
         // Si la file d'attente est vide, on ne fait rien
-        printf("File d'attente vide, aucun processus a planifier\n");
+        // printfk("File d'attente vide, aucun processus a planifier\n");
         schedule_locked = false; // Deverrouille le planificateur
         return;
     }
@@ -228,7 +228,7 @@ void schedule() {
     struct process_t *next_process = ready_active_process[0];
 
     if (current_process == NULL) {
-        printf("Aucun processus en cours d'execution, on demarre le processus %d\n", next_process->pid);
+        // printfk("Aucun processus en cours d'execution, on demarre le processus %d\n", next_process->pid);
         // Si aucun processus n'est en cours d'execution, on le demarre
         current_process = next_process;
         current_process->state = ELU; // On le passe a l'etat ELU
@@ -237,11 +237,13 @@ void schedule() {
         
         // Important: Unlock scheduler before executing the first process
         schedule_locked = false;
+        // Reset duration counter
+        current_process_duration = 0;
         return;
     }
     // In fact, we should used another function if the state is TERMINE to liberate the resources like the regs array
     else if (current_process->state != ELU || current_process->priority >= next_process->priority) {
-        printf("==SWITCHING==\n");
+        // printfk("==SWITCHING==\n");
 
         // Save old process info before the switch
         pid_t old_pid = current_process->pid;
@@ -276,19 +278,21 @@ void schedule() {
             }
         }
         
-        printf("Switching from PID=%d to PID=%d\n", old_pid, next_process->pid);
+        // printfk("Switching from PID=%d to PID=%d\n", old_pid, next_process->pid);
         
+        // Reset duration counter
+        current_process_duration = 0;
         // CRITICAL: Unlock scheduler before context switch
         schedule_locked = false;
                 
         // This is the point of no return - after this the function will not continue
         ctx_sw((process_table[old_pid]->context.regs), (process_table[next_process->pid]->context.regs));
         // Code below this point will only execute when this process is switched back to
-        printf("Resumed execution of process %d\n", getpid());
+        // printfk("Resumed execution of process %d\n", getpid());
     } else {
         // Current process has higher priority, keep running it
-        printf("Current process (PID=%d) has higher priority than next candidate (PID=%d)\n", 
-               current_process->pid, next_process->pid);
+        // printfk("Current process (PID=%d) has higher priority than next candidate (PID=%d)\n", 
+            //    current_process->pid, next_process->pid);
         schedule_locked = false;
     }
 }
@@ -310,18 +314,18 @@ void arreter() {
 
 /* Activation du processus - passage de l'etat suspendu a actif */
 void activer(pid_t pid) {
-    printfk("Activating process with PID=%d, current state: %d\n", pid, process_table[pid]->state);
+    // printfk("Activating process with PID=%d, current state: %d\n", pid, process_table[pid]->state);
     if (process_table[pid]->state == PRET_SUSPENDU) {
         process_table[pid]->state = PRET_ACTIF;
         addProcess(pid);
-        printfk("Process PID=%d activated and added to ready queue\n", pid);
+        // printfk("Process PID=%d activated and added to ready queue\n", pid);
     }
     else if (process_table[pid]->state == BLOQUE_SUSPENDU) {
         process_table[pid]->state = BLOQUE_ACTIF;
         // Pas besoin d'ajouter a la file des ressources car deja fait lors du blocage
-        printfk("Process PID=%d activated but still blocked on resources\n", pid);
+        // printfk("Process PID=%d activated but still blocked on resources\n", pid);
     } else {
-        printfk("Process PID=%d already active, state=%d\n", pid, process_table[pid]->state);
+        // printfk("Process PID=%d already active, state=%d\n", pid, process_table[pid]->state);
     }
 }
 
@@ -400,13 +404,13 @@ void terminer(pid_t pid) {
                     removeResource(process_to_terminate->resources[i], process_to_terminate->pid);
                 }
             }
-            printfk("Processus %d termine\n", pid);
+            // printfk("Processus %d termine\n", pid);
             // On appelle le schedule pour elire un nouveau processus
             schedule();
         }
     } else {
         // Si aucun pid n'est fourni, on termine le processus en cours
-        printfk("Erreure: pid invalide\n");
+        // printfk("Erreure: pid invalide\n");
         schedule_locked = false; // Deverrouille le planificateur
         return;
     }
@@ -461,6 +465,18 @@ void liberer_processus(pid_t pid) {
     }
 }
 
+void handle_scheduling_IT() {
+    // Only attempt scheduling if scheduler isn't locked and there's a current process
+    // Use a simplified condition to avoid potential issues
+
+    // Check if it's time to schedule a new process
+    // // printfk("Time slot expired for PID=%d, switching...\n", current_process->pid);
+    
+    // Call scheduler
+    schedule();
+}
+
+
 /* Simplified and safer version of display_scheduler_state */
 void display_scheduler_state() {
     printfk("=== SCHEDULER STATE ===\n");
@@ -494,12 +510,12 @@ void display_scheduler_state() {
                    i, ready_active_process[i]->pid, ready_active_process[i]->priority);
         }
     }
-    printfk("Ready Processes Count: %d\n", ready_count);
+    // printfk("Ready Processes Count: %d\n", ready_count);
     
     if (ready_count != nb_ready_active_process) {
-        printfk("Counter mismatch: %d vs %d\n", ready_count, nb_ready_active_process);
+        // printfk("Counter mismatch: %d vs %d\n", ready_count, nb_ready_active_process);
         nb_ready_active_process = ready_count; // Auto-correct
     }
     
-    printfk("===========================\n");
+    printfk("===========================================\n");
 }

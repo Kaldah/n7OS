@@ -9,13 +9,9 @@
 #include <n7OS/sys.h>
 #include <unistd.h>
 #include <stdbool.h>
-#include <n7OS/printk.h> // Add for printfk function
+#include <n7OS/printk.h> 
 
 extern void handler_IT_TIMER();
-extern struct process_t *current_process; // Processus en cours d'exécution
-extern bool schedule_locked; // Variable pour vérifier si le planificateur est verrouillé
-uint32_t current_process_duration = 0;
-
 
 uint32_t time = 0;
 
@@ -33,30 +29,24 @@ void init_time() {
 }
 
 void handler_en_C_TIMER() {
+    extern uint32_t current_process_duration;
+    extern struct process_t *current_process;
+    extern bool schedule_locked;
     // Send acknowledgment to the PIC first
     outb(0x20, 0x20);
     
     // Increment time counter
     time++;
-
+    
     // Display current time every second
     if (time % 1000 == 0) {
         console_puts_time(get_time_string());
     }
-    
-    // Only attempt scheduling if scheduler isn't locked and there's a current process
-    // Use a simplified condition to avoid potential issues
-    if (!schedule_locked && current_process != NULL) {
-        current_process_duration++;
-        
-        // Check if it's time to schedule a new process
-        if (current_process_duration >= TIME_SLOT) {
-            // Reset duration counter
-            current_process_duration = 0;
-            
-            // Call scheduler
-            // schedule();
-        }
+
+    if (!schedule_locked && current_process != NULL) current_process_duration++;
+    if (current_process_duration >= TIME_SLOT) {
+        // Trigger process scheduling when time slot has expired
+        handle_scheduling_IT();
     }
 }
 
