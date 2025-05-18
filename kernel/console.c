@@ -1,6 +1,8 @@
-#include  <n7OS/console.h>
-#include  <n7OS/cpu.h>
+#include <n7OS/console.h>
+#include <n7OS/cpu.h>
 #include <string.h>
+#include <n7OS/time.h>
+#include <n7OS/printk.h> // Add for printfk function
 
 #define BLINK   0<<7
 #define BACK    BLACK<<4
@@ -22,6 +24,8 @@ uint16_t *scr_tab;
 void init_console() {
     scr_tab= (uint16_t *) SCREEN_ADDR;
     printfk("\f");
+    // On affiche le temps 0
+    console_puts_time("00:00:00");
 }
 
 // get the cursor position from memory
@@ -125,6 +129,9 @@ void console_putbytes(const char *s, int len) {
     scr_tab[cursor_pos]= (1 << 7|BACK|TEXT) << 8 | (scr_tab[cursor_pos] & 0x00FF);
     
     set_mem_cursor(cursor_pos);
+    // Properly use get_time_string() which returns a char* pointer
+    char *time_str = get_time_string();
+    console_puts_time(time_str);
 }
 
 void console_puts_time(const char *s) {

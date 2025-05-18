@@ -13,9 +13,10 @@
 #define NB_PROC 255 // Nombre maximum de processus
 #define STACK_SIZE 1024 // Taille de la pile d'un processus
 #define MAX_RESOURCES 10 // Nombre maximum de ressources par processus
+#define TIME_SLOT 300 // Durée d'un quantum de temps (en ms)
 
 typedef enum {ELU, PRET_ACTIF, PRET_SUSPENDU, BLOQUE_ACTIF,
-    BLOQUE_SUSPENDU} PROCESS_STATE;
+    BLOQUE_SUSPENDU, TERMINE} PROCESS_STATE;
 
 typedef uint32_t pid_t; // Type pour l'identifiant de processus
 
@@ -78,7 +79,7 @@ void addResource (RESOURCE_ID rid , pid_t pid );
 void removeResource (RESOURCE_ID rid , pid_t pid ) ;
 
 /* Gestion de l’unité centrale :*/
-void scheduler();
+void schedule();
 
 /* Stops process execution and returns it s stack */
 void * stop_process_uc();
@@ -88,4 +89,5 @@ pid_t getpid();
 
 /* pid of the parent process */
 pid_t getppid();
+
 #endif

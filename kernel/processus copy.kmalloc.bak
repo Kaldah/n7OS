@@ -3,15 +3,19 @@
 #include <stdbool.h>
 #include <n7OS/printk.h> // Add for printfk function
 #include <unistd.h>
+#include <n7OS/kheap.h> // Add for kmalloc functions
 
-// Define static arrays for all process components
-struct process_t process_entities[NB_PROC];  // Static array of process structures
-uint32_t process_stacks[NB_PROC][STACK_SIZE]; // Static array of process stacks
-RESOURCE_ID process_resources[NB_PROC][MAX_RESOURCES]; // Static array for process resources
-bool process_used[NB_PROC] = {false}; // Track which process slots are used
+// Simple stub for memory deallocation 
+// TODO: Replace with proper implementation when memory manager supports it
+static void kfree(void *ptr) {
+    // In a real implementation, this would free the memory
+    // For now, this is just a stub function
+    // The current kmalloc implementation doesn't support freeing memory
+    (void)ptr; // Avoid unused parameter warning
+}
 
 extern void ctx_sw(void *ctx_old, void *ctx_new);
-struct process_t *process_table[NB_PROC]; // Table des processus (pointers to process_entities)
+struct process_t *process_table[NB_PROC]; // Table des processus
 struct process_t *ready_active_process[NB_PROC]; // File d'attente des processus prets
 uint32_t nb_ready_active_process; // Nombre de processus prets
 
@@ -54,63 +58,72 @@ pid_t getppid(pid_t pid) {
     return -1; // Aucun parent trouve
 }
 
-// Initialize resources for a process using our static array
-RESOURCES_LIST init_resources(pid_t pid) {
-    // Clear all resources for this process
-    for (int i = 0; i < MAX_RESOURCES; i++) {
-        process_resources[pid][i] = 0;
-    }
-    return process_resources[pid]; // Return pointer to this process's resource array
+// No ressources allocated at the beginning
+RESOURCES_LIST init_resources() {
+    return NULL; // Return NULL for an empty list
 }
 
-// Get stack for a process from our static array
-void* init_stack(pid_t pid) {
-    return (void*)process_stacks[pid]; // Return pointer to this process's stack
+// Allocate memory dynamically instead of returning local variable
+void* init_stack() {
+    // Initialise la pile d'un processus
+    void *stack = (void*)kmalloc(STACK_SIZE * sizeof(uint32_t));
+
+    return stack; // Return pointer to the allocated stack
 }
 
 
 /* Creation d'un processus */
 pid_t create(void * program, char * name) {
-    pid_t pid;
+    pid_t Pid;
     
-    if ((pid = Allouer_Pid()) == (pid_t)-1) {
+    if ((Pid = Allouer_Pid()) == (pid_t)-1) {
         printfk("Cannot create new process\n");
         shutdown(1); // Shutdown if no PID available
     }
     
-    // Mark this process slot as used
-    process_used[pid] = true;
-    
-    // Use the pre-allocated process structure
-    struct process_t *new_process = &process_entities[pid];
-    
-    // Initialize the process
-    new_process->name = name;
-    new_process->priority = nb_ready_active_process;
-    new_process->pid = pid;
-    new_process->ppid = current_process ? current_process->pid : 0;
-    new_process->stack = init_stack(pid);
+    // Allouer de la memoire pour le nouveau processus
+    struct process_t * new_process = (struct process_t *)kmalloc(sizeof(struct process_t));
+    if (!new_process) {
+        printfk("Failed to allocate memory for new process\n");
+        shutdown(1);
+    }
+
+    // Initialiser le nouveau processus
+    new_process->name = name; // Nom du processus
+    new_process->priority = nb_ready_active_process; // Priorite par defaut
+    new_process->pid = Pid;
+    new_process->ppid = current_process ? current_process->pid : 0; // Le parent est le processus en cours ou 0 si aucun
+    new_process->stack = init_stack();
     new_process->state = PRET_SUSPENDU;
-    new_process->resources = init_resources(pid);
+    new_process->resources = init_resources();
+
+    void * stack_top = new_process->stack + STACK_SIZE; // Pointeur vers le sommet de la pile
+
+    // Placer la fonction a executer au sommet de la pile
+    *(uint32_t*)(stack_top) = (uint32_t)program;
+
+    stack_context_t *context = (stack_context_t *)kmalloc(sizeof(stack_context_t)); // Allocation de memoire pour le contexte d'execution
+    if (!context) {
+        printfk("Failed to allocate memory for context\n");
+        // Use kfree instead of free
+        kfree(new_process->stack);
+        kfree(new_process);
+        shutdown(1);
+    }
     
-    // Calculate stack top (end of the array)
-    void *stack_top = (void*)((uint32_t)new_process->stack + STACK_SIZE * sizeof(uint32_t) - sizeof(uint32_t));
+    // Initialiser le contexte du processus
+    context->s.ebx = 0; // Initialisation des registres
+    context->s.esp = (uint32_t)stack_top; // Correctly cast void* to uint32_t
+    context->s.ebp = (uint32_t)new_process->stack; // Correctly cast void* to uint32_t
+    context->s.esi = 0; // Initialisation des registres
+    context->s.edi = 0; // Initialisation des registres
+
+    new_process->context = *context; // Contexte d'execution du processus
+    kfree(context); // Use kfree instead of free for the temporary context
+
+    process_table[Pid] = new_process;
     
-    // Put the program pointer at the top of the stack
-    *(uint32_t*)stack_top = (uint32_t)program;
-    
-    // Initialize context directly in the process structure (no temporary context needed)
-    new_process->context.s.ebx = 0;
-    new_process->context.s.esp = (uint32_t)stack_top;
-    // new_process->context.s.ebp = (uint32_t)new_process->stack;
-    new_process->context.s.ebp = 0;
-    new_process->context.s.esi = 0;
-    new_process->context.s.edi = 0;
-    
-    // Set the process in the process table
-    process_table[pid] = new_process;
-    
-    return pid;
+    return Pid;
 }
 
 void addProcess(pid_t pid) {
@@ -414,17 +427,32 @@ void terminer(pid_t pid) {
 
 
 // Fix for addResource function
-void addResource(RESOURCE_ID rid, pid_t pid) {
+void addResource (RESOURCE_ID rid , pid_t pid ) {
     // Ajoute le processus pid a la file d'attente de la ressource rid
     // Implementation specifique a la gestion des ressources
-    
-    // Resources are already allocated in static array, just add the resource
+
+    // On devrait verifier si les ressources sont deja allouees
+    // Si elles ne le sont pas, on les initialise
+    // Sinon on les ajoute a la liste d'attente de la ressource
+
+    // On verifie s'il y a deja des ressources allouees
+    if (process_table[pid]->resources == NULL) {
+        // Allocate memory for resources
+        RESOURCES_LIST resources = (RESOURCES_LIST)kmalloc(sizeof(RESOURCE_ID) * MAX_RESOURCES);
+        resources[0] = rid;
+        
+        // Proper assignment without type mismatch
+        process_table[pid]->resources = resources;
+    }
+
+    // On ajoute la ressource a la liste des ressources
     for (int i = 0; i < MAX_RESOURCES; i++) {
-        if (process_resources[pid][i] == 0) { // Trouve un emplacement vide, on considere 0 comme non utilise
-            process_resources[pid][i] = rid; // Ajoute la ressource
+        if (process_table[pid]->resources[i] == 0) { // Trouve un emplacement vide, on considere 0 comme non utilise
+            process_table[pid]->resources[i] = rid; // Ajoute la ressource
             break;
         }
     }
+    
 }
 void removeResource (RESOURCE_ID rid , pid_t pid ) {
     // Supprime le processus pid de la file d'attente de la ressource rid
@@ -440,22 +468,22 @@ void removeResource (RESOURCE_ID rid , pid_t pid ) {
 }
 
 void liberer_processus(pid_t pid) {
-    // No need to free memory with static arrays, just mark the process as unused
+    
+    // Libere la memoire allouee pour le processus
     if (process_table[pid] != NULL) {
         // Make sure the process is actually terminated
         if (process_table[pid]->state == TERMINE) {
             // Make sure we're not trying to free the current process
             if (current_process != process_table[pid]) {
-                // Mark process slot as unused
-                process_used[pid] = false;
-                
-                // Clear resources array (not strictly necessary but good practice)
-                for (int i = 0; i < MAX_RESOURCES; i++) {
-                    process_resources[pid][i] = 0;
+                if (process_table[pid]->stack) {
+                    kfree(process_table[pid]->stack); // Use kfree instead of free
                 }
-                
-                // Remove from process table
-                process_table[pid] = NULL;
+                if (process_table[pid]->resources) {
+                    kfree(process_table[pid]->resources); // Use kfree instead of free
+                }
+                // No need to check 'context.regs' since it's an array, not a pointer
+                kfree(process_table[pid]); // Use kfree instead of free
+                process_table[pid] = NULL; // Reinitialise le pointeur dans la table
             }
         }
     }

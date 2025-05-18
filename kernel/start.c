@@ -12,22 +12,35 @@
 #include <n7OS/sys.h>
 #include <unistd.h>
 #include <n7OS/processus.h>
+#include <stdlib.h> // Add for shutdown function
 
 extern void processus1();
 
+// Forward declaration of functions used in this file
+void display_scheduler_state(void);
+void terminer(pid_t pid);
+
 void idle() {
-
     // code de idle
-    printf("Idle process\n");
-    pid_t pid_proc1 = create(processus1, "Processus 1");
-    activer(pid_proc1); // on active le processus 1 
+    printf("Idle process started\n");
     schedule();
+    // On ne doit jamais sortir de idle
+    while (1) {
+        printf("===============================Idle process time : %u\n", get_time());
+        display_scheduler_state();
 
-    for (int i = 0; i < 3; i++) {
-        printf("Idle goes brr\n");
+        while (get_time() % 5000 != 0) {
+            // Attendre jusqu'à la prochaine seconde
+            hlt();
+        }
 
-        arreter(); // cette fonction arrête le processeur élu
+        arreter(); // Arrête le processus
+        // Using hlt() instead of arreter() to prevent system overload
+        // This pauses the CPU until the next interrupt
+        // hlt();
     }
+    // Ne doit jamais sortir de idle
+    terminer(getpid()); // Termine le processus
 }
 
 
@@ -56,43 +69,28 @@ void kernel_start(void)
 
     // initialisation de l'horloge
     init_time();
-
+    
     // lancement des interruptions
     sti();
 
-
-    // // Exemple d'envoie d'une interruption 50
-    // __asm__ volatile("int $50");
-
-    // affichage de la console
-
-    // On affiche le temps 0
-    console_puts_time("00:00:00");
-    
-    // affichage d'une chaine de caracteres
-    printf("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-
-    if (example() == 1) {
-        printf ("Appel systeme example ok\n");
-    }
-
-    if (shutdown(2) == -1) {
-        printf ("Appel systeme shutdown ok\n");
-    }
-    else {
-        printf ("Appel systeme shutdown ko\n");
-    }
-
+    // Create the idle process first
+    printf("Création du processus Idle\n");
     pid_t pidmain = create(idle, "Idle process");
-    // on active le processus idle
+    
+    // Set the idle process as active
+    activer(pidmain);
 
-    activer(pidmain); // on active le processus idle
-    // On lance idle
+    printf("Création processus 1\n");
+    pid_t pid_proc1 = create(processus1, "Processus 1");
+    activer(pid_proc1); // on active le processus 1 
+
+
+    // Start the idle process
     idle();
 
-    // on ne doit jamais sortir de kernel_start
+    // This should never be reached
     while (1) {
-        // cette fonction arrête le processeur
         hlt();
     }
+    // shutdown(0); // On ne doit jamais sortir de idle
 }

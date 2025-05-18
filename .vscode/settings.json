@@ -26,6 +26,13 @@
         "stdio.h": "c",
         "time.h": "c",
         "stdint.h": "c",
-        "sys.h": "c"
+        "sys.h": "c",
+        "processus.h": "c",
+        "*.bakworking": "c",
+        "*.mallocbak": "c",
+        "*.bak": "c",
+        "stdbool.h": "c",
+        "unistd.h": "c",
+        "stdlib.h": "c"
     }
 }

@@ -1,5 +1,7 @@
 #include <inttypes.h>
 #include <n7OS/irq.h>
+#include <n7OS/printk.h> // Add for printfk function
+#include <unistd.h>
 
 // initialise la ligne num_line avec le traitant handler
 void init_irq_entry(int irq_num, uint32_t addr_handler) {

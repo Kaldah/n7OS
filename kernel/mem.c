@@ -1,8 +1,7 @@
 #include <n7OS/mem.h>
-#include <stdio.h>
-#include <stdbool.h> 
-#include <stddef.h>
-#include <string.h> // Include for memset
+#include <string.h>
+#include <stdbool.h>
+#include <n7OS/printk.h> // Add for printfk function
 #include <n7OS/kheap.h>
 
 uint32_t *free_page_bitmap_table;

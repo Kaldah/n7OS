@@ -13,7 +13,7 @@ void init_syscall() {
   add_syscall(NR_example, sys_example);
   add_syscall(NR_shutdown, sys_shutdown);
   add_syscall(NR_write, sys_write);
-  // add_syscall(NR_fork, sys_write);
+  // add_syscall(NR_fork, sys_fork);
 
   // initialisation de l'IT soft qui gère les appels systeme
   init_irq_entry(0x80, (uint32_t) handler_syscall);

@@ -1,9 +1,9 @@
 #include <n7OS/paging.h>
-//#include <stddef.h> // nécessaire pour NULL
+#include <n7OS/mem.h>
 #include <string.h>
 #include <stdio.h>
 #include <n7OS/kheap.h>
-#include <n7OS/mem.h>
+#include <n7OS/printk.h> // Add for printfk function
 
 #define ACTIVATE_PAGING 0x80000000
 
