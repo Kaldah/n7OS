@@ -3,11 +3,13 @@
 
 #define NB_SYSCALL 7
 
+#include <n7OS/processus.h>
+
 int sys_example();
 int sys_shutdown(int n);
 int sys_write(const char *s, int len);
 int sys_fork();
-int sys_getpid();
+int sys_get_pid();
 int sys_exit();
 int sys_sleep(int seconds);
 

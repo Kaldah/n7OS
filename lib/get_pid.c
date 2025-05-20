@@ -1,7 +1,8 @@
 #include <unistd.h>
+#include <n7OS/processus.h>
 
 /* code de la fonction
-    pid_t getpid();
+    int get_pid();
     pas d'argument -> appel à la fonction d'enveloppe syscall0
 */
-syscall0(pid_t, getpid)
+syscall0(int, get_pid)

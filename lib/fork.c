@@ -1,7 +1,8 @@
 #include <unistd.h>
+#include <n7OS/processus.h>
 
 /* code de la fonction
-    pid_t fork();
+    int fork();
     pas d'argument -> appel à la fonction d'enveloppe syscall0
 */
-syscall0(pid_t, fork)
+syscall0(int, fork)

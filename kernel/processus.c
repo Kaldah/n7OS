@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <n7OS/printk.h> // Add for // printfk function
 #include <unistd.h>
+#include <n7OS/cpu.h>
 
 // Define static arrays for all process components
 struct process_t process_entities[NB_PROC];  // Static array of process structures
@@ -549,6 +550,9 @@ void rename_process(pid_t pid, char *name) {
 
 // Dummy process to create "empty" processes for fork
 void dummy_process() {
+    // This function should never be called directly in a normal fork.
+    // If it is called, it means something went wrong with the context switch.
+    printf("ERROR: dummy_process executed directly. This should never happen in a normal fork.\n");
     while (1) {
         hlt();
     }

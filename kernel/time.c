@@ -83,7 +83,7 @@ char * get_time_string() {
 
 // Function to suspend a process for a specified duration
 void suspend_process_timer(pid_t pid, uint32_t duration) {
-    if (pid < 0 || pid >= NB_PROC) {
+    if (pid >= NB_PROC) {
         return; // Invalid PID
     }
     

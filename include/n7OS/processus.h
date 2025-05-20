@@ -13,7 +13,7 @@
 #define NB_PROC 255 // Nombre maximum de processus
 #define STACK_SIZE 1024 // Taille de la pile d'un processus
 #define MAX_RESOURCES 10 // Nombre maximum de ressources par processus
-#define TIME_SLOT 5000 // Durée d'un quantum de temps (en ms)
+#define TIME_SLOT 1000 // Durée d'un quantum de temps (en ms)
 
 typedef enum {ELU, PRET_ACTIF, PRET_SUSPENDU, BLOQUE_ACTIF,
     BLOQUE_SUSPENDU, TERMINE} PROCESS_STATE;
@@ -95,4 +95,9 @@ void terminer(pid_t pid); /* Terminate the process pid */
 void handle_scheduling_IT(); /* Handle scheduling interrupt */
 
 void display_scheduler_state(); /* Display the state of the scheduler */
+
+void wakeup_process(pid_t pid); /* Wake up a suspended process at end of timer */
+
+void dummy_process(); /* Dummy process for forking */
+
 #endif

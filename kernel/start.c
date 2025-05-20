@@ -21,14 +21,27 @@ void idle() {
     // code de idle
     printf("Idle process started\n");
 
-    // On ne doit jamais sortir de idle
-    while (1) {
-        printf("Idle process running...\n");
-        // display_scheduler_state();
-        while (get_time() % TIME_SLOT/2 != 0) {
-            hlt();
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Code du processus fils
+        printf("Processus fils cree avec PID %d\n", getpid());
+        while (1) {
+            processus1();
+        }
+    } else if (pid > 0) {
+        // Code du processus père
+        printf("Processus pere en cours d'exécution...\n");
+        printf("PID du processus pere : %d\n", getpid());
+        printf("PID du processus fils : %d\n", pid);
+        display_scheduler_state();
+        // Boucle infinie pour le processus père
+        while (1) {
+            while (get_time() % TIME_SLOT/2 != 0) {
+                hlt();
+            }
         }
     }
+
     // Ne doit jamais sortir de idle
     terminer(getpid()); // Termine le processus
 }
@@ -70,9 +83,11 @@ void kernel_start(void)
     // Set the idle process as active
     activer(pidmain);
 
-    // printf("Création processus 1\n");
-    // pid_t pid_proc1 = create(processus1, "Processus 1");
-    // activer(pid_proc1); // on active le processus 1 
+    if (example() == 1) {
+        printf("=== Appel système example réussi ===\n");
+    } else {
+        printf("=== Appel système example échoué ===\n");
+    }
 
     schedule();
 
