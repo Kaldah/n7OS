@@ -18,10 +18,8 @@
 extern void processus1();
 
 void idle() {
-    extern void handle_scheduling_IT();
     // code de idle
     printf("Idle process started\n");
-    schedule();
 
     // On ne doit jamais sortir de idle
     while (1) {
@@ -72,10 +70,11 @@ void kernel_start(void)
     // Set the idle process as active
     activer(pidmain);
 
-    printf("Création processus 1\n");
-    pid_t pid_proc1 = create(processus1, "Processus 1");
-    activer(pid_proc1); // on active le processus 1 
+    // printf("Création processus 1\n");
+    // pid_t pid_proc1 = create(processus1, "Processus 1");
+    // activer(pid_proc1); // on active le processus 1 
 
+    schedule();
 
     // Start the idle process
     idle();

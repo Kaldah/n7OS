@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <n7OS/processus.h>
+// #include <n7OS/processus.h>
 #include <stdbool.h>
 #include <n7OS/cpu.h>
 #include <n7OS/time.h> // Add for get_time function
@@ -8,7 +8,7 @@
 void terminer(pid_t pid);
 
 void processus1() {
-  sti(); // Active les interruptions
+  // sti(); // Active les interruptions
 
   pid_t pid = getpid(); // Récupère le PID du processus
   printf("Hello, world from P1 (PID=%d)\n", pid);

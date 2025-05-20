@@ -14,10 +14,13 @@
 extern void handler_IT_TIMER();
 
 uint32_t time = 0;
-
+uint32_t suspended_process_wakeup_time[NB_PROC]; // Wake up time for suspended processes
 
 // initialise la ligne num_line avec le traitant handler
 void init_time() {
+    for (int i = 0; i < NB_PROC; i++) {
+        suspended_process_wakeup_time[i] = 0;
+    }
     printfk("===Initialisation de l'horloge===\n");
     init_irq_entry(0x20, (uint32_t) handler_IT_TIMER);
 
@@ -48,6 +51,15 @@ void handler_en_C_TIMER() {
         // Trigger process scheduling when time slot has expired
         handle_scheduling_IT();
     }
+    // Check if any suspended processes need to be activated
+    for (int i = 0; i < NB_PROC; i++) {
+        if (suspended_process_wakeup_time[i] != 0 && suspended_process_wakeup_time[i] <= get_time()) {
+            suspended_process_wakeup_time[i] = 0; // Reset the wake-up time
+            // Wake up the suspended process
+            wakeup_process((pid_t) i);
+        }
+    }
+
 }
 
 uint32_t get_time() {
@@ -67,4 +79,17 @@ char * get_time_string() {
     // Use the static buffer instead of a string literal
     snprintf(time_buffer, 9, "%02u:%02u:%02u", hours, minutes, seconds);
     return time_buffer;
+}
+
+// Function to suspend a process for a specified duration
+void suspend_process_timer(pid_t pid, uint32_t duration) {
+    if (pid < 0 || pid >= NB_PROC) {
+        return; // Invalid PID
+    }
+    
+    // Set the wake-up time for the suspended process
+    suspended_process_wakeup_time[pid] = get_time() + duration;
+
+    // Suspend the process
+    suspendre(pid);
 }

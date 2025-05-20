@@ -20,9 +20,11 @@ uint32_t nb_ready_active_process; // Nombre de processus prets
 // vers les processus bloques sur une ressource pour le moment
 struct process_t *blocked_process[NB_PROC]; // File d'attente des processus bloques
 struct process_t *current_process = NULL; // Pointeur vers le processus en cours d'execution
+
 uint32_t current_process_duration = 0; // Durée d'execution du processus en cours
 
 bool schedule_locked = false; // Variable pour verifier si le planificateur est verrouille
+
 
 /* Fonctions utilitaires */
 static pid_t Allouer_Pid() {
@@ -270,7 +272,8 @@ void schedule() {
         // Update priorities of remaining processes in ready queue
         for (int i = 0; i < NB_PROC; i++) {
             if (ready_active_process[i] != NULL) {
-                if (ready_active_process[i]->priority > 0) {
+                // Priority 0 is reserved for waking up processes or to start a process directly
+                if (ready_active_process[i]->priority > 1) {
                     ready_active_process[i]->priority--;
                 }
             } else {
@@ -348,6 +351,10 @@ void suspendre(pid_t pid) {
             }
         }
     }
+    else {
+        return; // Processus deja suspendu
+    }
+
 }
 
 
@@ -518,4 +525,31 @@ void display_scheduler_state() {
     }
     
     printfk("===========================================\n");
+}
+
+void wakeup_process(pid_t pid) {
+    // Wake up a suspended process
+    if (process_table[pid] != NULL) {
+        process_table[pid]->state = PRET_ACTIF; // Change state to ready
+        process_table[pid]->priority = 0; // Set priority to the highest
+        addProcess(pid); // Add to the ready queue (Should be first in line)
+    } else {
+        printfk("Processus %d non trouve\n", pid);
+    }
+}
+
+void rename_process(pid_t pid, char *name) {
+    // Renomme le processus avec le PID donne
+    if (process_table[pid] != NULL) {
+        process_table[pid]->name = name;
+    } else {
+        printfk("Processus %d non trouve\n", pid);
+    }
+}
+
+// Dummy process to create "empty" processes for fork
+void dummy_process() {
+    while (1) {
+        hlt();
+    }
 }
