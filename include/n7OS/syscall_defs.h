@@ -1,7 +1,7 @@
 #ifndef __SYSCALL_DEFS_H__
 #define __SYSCALL_DEFS_H__
 
-#define NB_SYSCALL 7
+#define NB_SYSCALL 10
 
 #include <n7OS/processus.h>
 
@@ -12,6 +12,9 @@ int sys_fork();
 int sys_get_pid();
 int sys_exit();
 int sys_sleep(int seconds);
+int sys_spawn(void *entry_point, const char *name);
+int sys_execve(void *entry_point);
+int sys_vfork(void);
 
 typedef int (*fn_ptr)();
 extern fn_ptr syscall_table[NB_SYSCALL];

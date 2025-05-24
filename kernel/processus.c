@@ -7,9 +7,8 @@
 
 // Define static arrays for all process components
 struct process_t process_entities[NB_PROC];  // Static array of process structures
-uint32_t process_stacks[NB_PROC][STACK_SIZE]; // Static array of process stacks
+uint32_t process_stacks[NB_PROC][STACK_SIZE]; // Static array of process stacks to reserve memory
 RESOURCE_ID process_resources[NB_PROC][MAX_RESOURCES]; // Static array for process resources
-bool process_used[NB_PROC] = {false}; // Track which process slots are used
 
 extern void ctx_sw(void *ctx_old, void *ctx_new);
 struct process_t *process_table[NB_PROC]; // Table des processus (pointers to process_entities)
@@ -28,7 +27,7 @@ bool schedule_locked = false; // Variable pour verifier si le planificateur est 
 
 
 /* Fonctions utilitaires */
-static pid_t Allouer_Pid() {
+pid_t Allouer_Pid() {
     // Recherche d'un PID disponible
     for (pid_t i = 0; i < NB_PROC; i++) {
         if (process_table[i] == NULL) { // Considere 0 comme PID invalide/non utilise car c'est celui de l'ID du noyau
@@ -69,21 +68,22 @@ RESOURCES_LIST init_resources(pid_t pid) {
 
 // Get stack for a process from our static array
 void* init_stack(pid_t pid) {
-    return (void*)process_stacks[pid]; // Return pointer to this process's stack
+    // Reset the stack for this process
+    for (int i = 0; i < STACK_SIZE; i++) {
+        process_stacks[pid][i] = 0; // Initialize the stack with zeros
+    }
+    // Return pointer to this process's stack array
+    return (void*)process_stacks[pid];
 }
 
 
 /* Creation d'un processus */
 pid_t create(void * program, char * name) {
     pid_t pid;
-    
     if ((pid = Allouer_Pid()) == (pid_t)-1) {
-        // printfk("Cannot create new process\n");
+        printfk("Cannot create new process\n");
         shutdown(1); // Shutdown if no PID available
     }
-    
-    // Mark this process slot as used
-    process_used[pid] = true;
     
     // Use the pre-allocated process structure
     struct process_t *new_process = &process_entities[pid];
@@ -99,17 +99,27 @@ pid_t create(void * program, char * name) {
     
     // Calculate stack top (end of the array)
     void *stack_top = (void*)((uint32_t)new_process->stack + STACK_SIZE * sizeof(uint32_t) - sizeof(uint32_t));
-    
+    // void *stack_top = (void*)((uint32_t)new_process->stack + (STACK_SIZE - 1) * sizeof(uint32_t));
+    // printf("Stack top for PID %d: %x\n", pid, (uint32_t)stack_top);
+    // printf("Stack bottom for PID %d: %x\n", pid, (uint32_t)new_process->stack);
     // Put the program pointer at the top of the stack
+
     *(uint32_t*)stack_top = (uint32_t)program;
+
+    // Fix: properly access the stack array as uint32_t array
+    // uint32_t *stack_array = (uint32_t *)new_process->stack;
+    // stack_array[STACK_SIZE - 1] = (uint32_t)program; // Set the program pointer at the top of the stack
     
     // Initialize context directly in the process structure (no temporary context needed)
     new_process->context.s.ebx = 0;
     new_process->context.s.esp = (uint32_t)stack_top;
-    // new_process->context.s.ebp = (uint32_t)new_process->stack;
+    // new_process->context.s.esp = (uint32_t)&stack_array[STACK_SIZE - 1];
     new_process->context.s.ebp = 0;
     new_process->context.s.esi = 0;
     new_process->context.s.edi = 0;
+    // Initialiser les flags avec interruptions activées (IF=1, bit 9)
+    // 0x200 est le bit IF (Interrupt Flag)
+    new_process->context.s.eflags = 0x200;
     
     // Set the process in the process table
     process_table[pid] = new_process;
@@ -255,7 +265,15 @@ void schedule() {
         if (current_process->state == ELU) {
             // We stop the current process
             current_process->state = PRET_ACTIF; // Set the state to ready
-            current_process->priority = nb_ready_active_process; // Set the priority to the lowest
+            
+            // Set the priority to the lowest, to avoid monopoly
+            // Using explicit if-else to avoid generating CMOV instruction
+            if (nb_ready_active_process > 2) {
+                current_process->priority = nb_ready_active_process;
+            } else {
+                current_process->priority = 2;
+            }
+            
             // Add the current process back to the ready queue
             addProcess(old_pid);
         }
@@ -403,16 +421,30 @@ void terminer(pid_t pid) {
         // On verifie si le processus est en cours d'execution
         struct process_t * process_to_terminate = process_table[pid];
         if (process_to_terminate->state == ELU) {
-            // On le passe a l'etat TERMINE
-            process_to_terminate->state = TERMINE;
-
-             // On debloque toutes les ressources utilisees par le processus
+            // On debloque toutes les ressources utilisees par le processus
             for (int i = 0; i < MAX_RESOURCES; i++) {
                 if (process_to_terminate->resources[i] != 0) {
                     removeResource(process_to_terminate->resources[i], process_to_terminate->pid);
                 }
             }
-            // printfk("Processus %d termine\n", pid);
+        } else if (process_to_terminate->state == PRET_ACTIF) {
+            // On le retire de la file d'attente des processus prets
+            removeProcess(pid);
+        } else if (process_to_terminate->state == BLOQUE_ACTIF) {
+            // On le retire de la file d'attente des ressources
+            for (int i = 0; i < MAX_RESOURCES; i++) {
+                if (process_to_terminate->resources[i] != 0) {
+                    removeResource(process_to_terminate->resources[i], process_to_terminate->pid);
+                }
+            }
+        }
+        process_to_terminate->state = TERMINE;
+        // printfk("Processus %d termine\n", pid);
+        if (process_table[pid]->ppid > 0) {
+            // On debloque le parent du processus termine
+            activer(process_table[pid]->ppid);
+        } else {
+            // printfk("Processus %d n'a pas de parent\n", pid);
             // On appelle le schedule pour elire un nouveau processus
             schedule();
         }
@@ -458,9 +490,6 @@ void liberer_processus(pid_t pid) {
         if (process_table[pid]->state == TERMINE) {
             // Make sure we're not trying to free the current process
             if (current_process != process_table[pid]) {
-                // Mark process slot as unused
-                process_used[pid] = false;
-                
                 // Clear resources array (not strictly necessary but good practice)
                 for (int i = 0; i < MAX_RESOURCES; i++) {
                     process_resources[pid][i] = 0;
@@ -491,22 +520,23 @@ void display_scheduler_state() {
     
     // Display minimal information about current process
     if (current_process != NULL) {
-        printfk("Current Process: PID=%d, State=%d\n", 
-               current_process->pid, 
-               current_process->state);
+        printfk("Current Process: PID=%d, State=%d, Priority=%d \n", 
+            current_process->pid, 
+            current_process->state,
+            current_process->priority);
     } else {
         printfk("Current Process: None\n");
     }
     
-    // Just count active processes without detailed printing
-    int active_count = 0;
+    // Just count existing processes without detailed printing
+    int existing_count = 0;
     for (int i = 0; i < NB_PROC; i++) {
         if (process_table[i] != NULL) {
-            active_count++;
+            existing_count++;
         }
     }
-    printfk("Total Active Processes: %d\n", active_count);
-    
+    printfk("Total Existing Processes: %d\n", existing_count);
+
     // Count and show ready processes (safely)
     uint32_t ready_count = 0;
     printfk("\nReady Process Queue:\n");
@@ -515,7 +545,7 @@ void display_scheduler_state() {
             ready_count++;
             // Only print PID and priority, avoid printing names which might be corrupted
             printfk("  Position %d: PID=%d, Priority=%d\n", 
-                   i, ready_active_process[i]->pid, ready_active_process[i]->priority);
+                i, ready_active_process[i]->pid, ready_active_process[i]->priority);
         }
     }
     // printfk("Ready Processes Count: %d\n", ready_count);
@@ -550,10 +580,13 @@ void rename_process(pid_t pid, char *name) {
 
 // Dummy process to create "empty" processes for fork
 void dummy_process() {
-    // This function should never be called directly in a normal fork.
-    // If it is called, it means something went wrong with the context switch.
-    printf("ERROR: dummy_process executed directly. This should never happen in a normal fork.\n");
+    // This function serve as placeholder when no process is available
     while (1) {
         hlt();
     }
+}
+
+pid_t resume_process() {
+    // Reprise normale après un fork
+    return 0; // Return 0 to know it's the child process
 }

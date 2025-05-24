@@ -9,6 +9,9 @@
 #define NR_get_pid 4
 #define NR_exit 5
 #define NR_sleep 6
+#define NR_spawn    7
+#define NR_execve   8
+#define NR_vfork    9
 
 // Fonction d'enveloppe sans argument
 #define syscall0(type,name) \

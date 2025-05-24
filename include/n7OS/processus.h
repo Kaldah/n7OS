@@ -29,13 +29,14 @@ typedef RESOURCE_ID * RESOURCES_LIST; // Type pour la liste des ressources d'un 
  */
 typedef union {
     struct {
-        uint32_t ebx; // Base index
-        uint32_t esp; // Stack pointer
-        uint32_t ebp; // Base pointer
-        uint32_t esi; // Source index
-        uint32_t edi; // Destination index
+        uint32_t ebx;    // Base index
+        uint32_t esp;    // Stack pointer
+        uint32_t ebp;    // Base pointer
+        uint32_t esi;    // Source index
+        uint32_t edi;    // Destination index
+        uint32_t eflags; // Flags CPU (CF, ZF, SF, etc.)
     } s;
-    uint32_t regs[5]; // Array access to the registers
+    uint32_t regs[6]; // Array access to the registers (maintenant 6 pour inclure eflags)
 } stack_context_t;
 
 /**
@@ -99,5 +100,9 @@ void display_scheduler_state(); /* Display the state of the scheduler */
 void wakeup_process(pid_t pid); /* Wake up a suspended process at end of timer */
 
 void dummy_process(); /* Dummy process for forking */
+
+uint32_t resume_process(); /* Resume the process for the child after the fork */
+
+void* init_stack(pid_t pid); /* Initialize the stack for a process and return the pointer */
 
 #endif

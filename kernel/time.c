@@ -84,6 +84,7 @@ char * get_time_string() {
 // Function to suspend a process for a specified duration
 void suspend_process_timer(pid_t pid, uint32_t duration) {
     if (pid >= NB_PROC) {
+        printfk("Invalid PID: %d\n", pid);
         return; // Invalid PID
     }
     

@@ -5,7 +5,7 @@
 
 // initialise la ligne num_line avec le traitant handler
 void init_irq_entry(int irq_num, uint32_t addr_handler) {
-    printfk("===Initialisation des interruptions===\n");
+    printfk("===Initialisation de l'IT %d===\n", irq_num);
     // on initialise la ligne d'interruption
     idt_entry_t *idt_entry = (idt_entry_t *) &idt[irq_num];
     idt_entry->offset_inf = (uint16_t) (addr_handler & 0xFFFF);

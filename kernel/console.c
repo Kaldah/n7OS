@@ -96,7 +96,10 @@ void console_putchar(const char c) {
 
     } else if (c == '\b') {
         // Retour arrière
-        cursor_pos--;
+        if (cursor_pos > 0) {
+            cursor_pos--; // Déplace le curseur en arrière
+            scr_tab[cursor_pos] = CHAR_COLOR << 8 | ' '; // Efface le caractère
+        }
 
     } else if (c == '\t') {
         cursor_pos = cursor_pos + 4;
