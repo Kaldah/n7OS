@@ -54,4 +54,17 @@ void console_puts_time(const char *s);
 void scroll_up();
 void scroll_down();
 
+// Fonctions d'accès au curseur et à l'écran
+uint16_t get_mem_cursor();
+void set_mem_cursor(uint16_t cursor_pos);
+void check_screen(uint16_t *cursor_pos);
+void console_putchar(const char c);
+
+// Nouvelles fonctions pour la gestion de l'interface utilisateur
+void console_clear_screen();
+void console_highlight_char(uint16_t position, uint16_t highlight_color);
+void console_restore_char(uint16_t position);
+void console_clear_line_from(uint16_t position);
+void console_reprint_at(uint16_t position, const char *s, int len);
+
 #endif

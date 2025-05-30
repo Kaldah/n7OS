@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <unistd.h> // Pour les appels système
 
 // Forward declarations for additional kernel-related utilities
 #include <n7OS/mem.h>       // Memory management functions
@@ -115,7 +116,7 @@ void mini_shell_process(void) {
 static void shell_display_prompt(void) {
     uint16_t cursor = get_mem_cursor();
     shell_ctx.prompt_start = cursor;
-    console_putbytes(SHELL_PROMPT, SHELL_PROMPT_LEN);
+    write(SHELL_PROMPT, SHELL_PROMPT_LEN); // Utilisation de l'appel système write
     shell_ctx.position = get_mem_cursor();
     shell_update_cursor();
 }
@@ -142,13 +143,13 @@ void mini_shell_process_key(char c) {
                 
                 // Enlever la surbrillance du caractère actuel avant de se déplacer
                 uint16_t old_pos = shell_ctx.position;
-                scr_tab[old_pos] = CHAR_COLOR << 8 | (scr_tab[old_pos] & 0x00FF);
+                console_restore_char(old_pos);
                 
                 shell_ctx.position--;
                 
-                // Effacer le caractère à l'écran
+                // Effacer le caractère à l'écran avec la bonne couleur
                 set_mem_cursor(shell_ctx.position);
-                console_putbytes(" ", 1);
+                scr_tab[shell_ctx.position] = NORMAL_COLOR | ' '; // Utiliser la couleur normale pour effacer
                 set_mem_cursor(shell_ctx.position);
             } else {
                 // Si on est au milieu du buffer, décaler tous les caractères
@@ -267,9 +268,9 @@ static void shell_clear_line(void) {
     // Calculer le nombre de caractères à effacer
     int chars_to_clear = SHELL_PROMPT_LEN + shell_ctx.buffer_len;
     
-    // Effacer les caractères
+    // Effacer les caractères avec la couleur normale
     for (int i = 0; i < chars_to_clear; i++) {
-        console_putbytes(" ", 1);
+        scr_tab[current_pos + i] = NORMAL_COLOR | ' ';
     }
     
     // Repositionner au début
@@ -598,10 +599,8 @@ static void shell_execute_command(void) {
         printfk("  kinfo          - Affiche des informations sur le noyau\n");
         printfk("  pkill [pid]    - Termine le processus avec l'ID spécifié\n");
     } else if (strcmp(args[0], "clear") == 0) {
-        // Effacer l'écran
-        for (int i = 0; i < 25 * 80; i++) {
-            scr_tab[i] = NORMAL_COLOR | ' ';
-        }
+        // Effacer l'écran en utilisant notre nouvelle fonction de console
+        console_clear_screen();
         set_mem_cursor(0);
         shell_ctx.prompt_start = 0;
         shell_ctx.position = SHELL_PROMPT_LEN;

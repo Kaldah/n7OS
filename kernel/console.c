@@ -2,12 +2,13 @@
 #include <n7OS/cpu.h>
 #include <string.h>
 #include <n7OS/time.h>
-#include <n7OS/printk.h> // Add for printfk function
+#include <n7OS/printk.h>
 
 #define BLINK   0<<7
 #define BACK    BLACK<<4
 #define TEXT    L_GREEN
 #define CHAR_COLOR (BLINK|BACK|TEXT)
+#define NORMAL_COLOR 0x0F00  // Blanc sur fond noir (attributs VGA)
 
 #define PORT_CMD 0x3D4
 #define PORT_DATA 0x3D5
@@ -18,6 +19,9 @@
 
 // Position de l'heure
 #define TIME_START_POSITION (VGA_WIDTH - 11) // 11 caractères pour " | 00:00:00"
+
+// Couleurs pour l'affichage de surbrillance
+#define USER_CURSOR_COLOR (BLINK|(GRAY<<4)|WHITE)
 
 uint16_t *scr_tab;
 
@@ -135,16 +139,15 @@ void console_putchar(const char c) {
 
     } else if (c == '\f') {
         // Effacer l'écran
-        for (int i = 0; i < VGA_SIZE; i++) {
-            scr_tab[i] = CHAR_COLOR << 8 | ' ';
-        }
-        cursor_pos = 0;
+        console_clear_screen();
+        cursor_pos = 0; // Revenir au début de l'écran
 
     } else if (c == '\b') {
         // Retour arrière
         if (cursor_pos > 0) {
             cursor_pos--; // Déplace le curseur en arrière
-            scr_tab[cursor_pos] = CHAR_COLOR << 8 | ' '; // Efface le caractère
+            // Use the normal color attribute for erasing characters
+            scr_tab[cursor_pos] = NORMAL_COLOR | ' '; // Efface le caractère
         }
 
     } else if (c == '\t') {
@@ -193,4 +196,60 @@ void console_puts_time(const char *s) {
     for (int i = 0; i < 11; i++) {
         scr_tab[TIME_START_POSITION + i] = CHAR_COLOR << 8 | formatted_time[i];
     }
+}
+
+// Nouvelles fonctions pour aider à la gestion du curseur utilisateur
+
+// Réinitialise l'écran pour le shell
+void console_clear_screen() {
+    for (int i = 0; i < VGA_SIZE; i++) {
+        scr_tab[i] = CHAR_COLOR << 8 | ' ';
+    }
+    set_mem_cursor(0);
+}
+
+// Met en surbrillance un caractère à une position spécifique (pour le curseur utilisateur)
+void console_highlight_char(uint16_t position, uint16_t highlight_color) {
+    // Sauvegarde le caractère actuel
+    char current_char = scr_tab[position] & 0xFF;
+    
+    // Applique la surbrillance tout en conservant le caractère
+    scr_tab[position] = highlight_color << 8 | current_char;
+}
+
+// Restaure un caractère à son apparence normale
+void console_restore_char(uint16_t position) {
+    // Sauvegarde le caractère actuel
+    char current_char = scr_tab[position] & 0xFF;
+    
+    // Restaure l'apparence normale
+    scr_tab[position] = CHAR_COLOR << 8 | current_char;
+}
+
+// Efface une ligne à partir d'une position donnée jusqu'à la fin de la ligne
+void console_clear_line_from(uint16_t position) {
+    // Calcule la position de fin de ligne
+    uint16_t end_of_line = (position / VGA_WIDTH + 1) * VGA_WIDTH;
+    
+    // Efface tous les caractères de la position jusqu'à la fin de la ligne
+    for (uint16_t i = position; i < end_of_line && i < VGA_SIZE; i++) {
+        scr_tab[i] = CHAR_COLOR << 8 | ' ';
+    }
+}
+
+// Ré-affiche une chaîne de caractères à une position donnée (utile pour le mini-shell)
+void console_reprint_at(uint16_t position, const char *s, int len) {
+    // Sauvegarde la position actuelle du curseur
+    uint16_t old_pos = get_mem_cursor();
+    
+    // Positionne le curseur à l'emplacement spécifié
+    set_mem_cursor(position);
+    
+    // Affiche la chaîne de caractères
+    for (int i = 0; i < len && position + i < VGA_SIZE; i++) {
+        scr_tab[position + i] = CHAR_COLOR << 8 | s[i];
+    }
+    
+    // Restaure la position du curseur
+    set_mem_cursor(old_pos);
 }
