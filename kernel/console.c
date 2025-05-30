@@ -21,8 +21,13 @@
 
 uint16_t *scr_tab;
 
+uint16_t history[HISTORY_SIZE]; // tableau pour l'historique des caractères
+uint16_t history_last_line_index = 0; // index de la dernière ligne enregistrée dans l'historique
+uint16_t history_current_index = 0; // index pour parcourir l'historique
+
 void init_console() {
     scr_tab= (uint16_t *) SCREEN_ADDR;
+    // On clear l'écran
     printfk("\f");
     // On affiche le temps 0
     console_puts_time("00:00:00");
@@ -40,10 +45,51 @@ uint16_t get_mem_cursor() {
 }
 
 void scroll_up() {
+    // we save the history using the history_end_index
+    // Save the whole line that is about to be scrolled off
+    // Pour éviter des bugs, on s'assure que l'historique est assez grand
+    if (HISTORY_SIZE >= VGA_WIDTH) {
+        int save_index = history_last_line_index * VGA_WIDTH;
+        for (int i = 0; i < VGA_WIDTH; i++) {
+            // Normalement l'historique contient un nombre de lignes donc
+            // est un multiple de VGA_WIDTH mais par prudence on met un modulo
+            history[(save_index + i) % HISTORY_SIZE] = scr_tab[i];
+        }
+        history_last_line_index = (history_last_line_index + 1) % NUMBER_OF_HISTORY_LINES;
+        // Mise à jour de history_current_index pour qu'il reste au même niveau que history_end_index
+        // si on n'est pas en train de parcourir l'historique
+        if (history_current_index == ((history_last_line_index + NUMBER_OF_HISTORY_LINES - 1) % NUMBER_OF_HISTORY_LINES)) {
+            history_current_index = history_last_line_index;
+        }
+    }
     // we move the screen up by one line
     memmove(scr_tab, scr_tab + VGA_WIDTH, (VGA_SIZE - VGA_WIDTH) * sizeof(uint16_t));
 }
 
+void scroll_down() {
+    // On vérifie si on peut scroller vers le bas (si on n'est pas déjà en bas de l'historique)
+    if (history_current_index != history_last_line_index) {
+        // D'abord, nous déplaçons l'écran vers le bas pour faire de la place pour la nouvelle ligne
+        memmove(scr_tab + VGA_WIDTH, scr_tab, (VGA_SIZE - VGA_WIDTH) * sizeof(uint16_t));
+        
+        // Ensuite, on calcule l'index précédent pour restaurer la ligne de l'historique
+        // Pour obtenir la ligne précédente dans l'historique, on recule d'une position
+        uint16_t prev_index = (history_current_index == 0) ? 
+                            NUMBER_OF_HISTORY_LINES - 1 : 
+                            history_current_index - 1;
+        
+        // On calcule l'index dans le tableau history[]
+        int restore_index = prev_index * VGA_WIDTH;
+        
+        // On restaure la ligne depuis l'historique à la première ligne de l'écran
+        for (int i = 0; i < VGA_WIDTH; i++) {
+            scr_tab[i] = history[(restore_index + i) % HISTORY_SIZE];
+        }
+        
+        // On met à jour l'index de l'historique
+        history_current_index = prev_index;
+    }
+}
 // check if the cursor is out of the screen
 void check_screen(uint16_t * cursor_pos) {
 

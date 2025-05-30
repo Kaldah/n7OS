@@ -14,13 +14,3 @@ DS: 0018
 ES : 0018
 FS : 0
 GS : 0
-
-Based on the new trap information, I can see we're still having issues with the context switch. Let me analyze the problem:
-
-Analysis of the Trap
-Trap 0E: Page fault
-Error Code 2: This indicates a write to a read-only page
-EIP: 001090D8 - This is likely inside the ctx_sw function
-ESP: 00000004 - This is suspiciously low, suggesting a stack issue
-EAX: 440 - This could be a pointer being dereferenced
-The key insight is that we're trying to write to a read-only area of memory at address 440 (the value in EAX). This suggests the context switch is trying to save data to an invalid or protected memory location.

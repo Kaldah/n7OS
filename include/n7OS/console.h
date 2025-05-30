@@ -7,6 +7,9 @@
 #define VGA_HEIGHT 25
 #define VGA_SIZE VGA_WIDTH * VGA_HEIGHT
 
+#define NUMBER_OF_HISTORY_LINES 100
+#define HISTORY_SIZE (NUMBER_OF_HISTORY_LINES * VGA_WIDTH)
+
 #define SCREEN_ADDR 0xB8000
 
 #define PORT_CMD  0x3D4
@@ -47,5 +50,8 @@ void init_console();
 void console_putbytes(const char *s, int len);
 
 void console_puts_time(const char *s);
+
+void scroll_up();
+void scroll_down();
 
 #endif

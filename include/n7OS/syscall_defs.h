@@ -13,7 +13,7 @@ int sys_get_pid();
 int sys_exit();
 int sys_sleep(int seconds);
 int sys_spawn(void *entry_point, const char *name);
-int sys_execve(void *entry_point);
+int sys_execve(const char *filename, char *const argv[], char *const envp[]);
 int sys_vfork(void);
 
 typedef int (*fn_ptr)();

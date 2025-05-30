@@ -1,17 +1,14 @@
 #include <n7OS/processus.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <n7OS/printk.h> // Add for // printfk function
+#include <n7OS/printk.h>
 #include <unistd.h>
 #include <n7OS/cpu.h>
 
 // Define static arrays for all process components
-struct process_t process_entities[NB_PROC];  // Static array of process structures
+struct process_t process_table[NB_PROC];  // Static array of process structures
 uint32_t process_stacks[NB_PROC][STACK_SIZE]; // Static array of process stacks to reserve memory
 RESOURCE_ID process_resources[NB_PROC][MAX_RESOURCES]; // Static array for process resources
-
-extern void ctx_sw(void *ctx_old, void *ctx_new);
-struct process_t *process_table[NB_PROC]; // Table des processus (pointers to process_entities)
 struct process_t *ready_active_process[NB_PROC]; // File d'attente des processus prets
 uint32_t nb_ready_active_process; // Nombre de processus prets
 
@@ -25,12 +22,15 @@ uint32_t current_process_duration = 0; // Durée d'execution du processus en cou
 
 bool schedule_locked = false; // Variable pour verifier si le planificateur est verrouille
 
+extern void ctx_sw(void *ctx_old, void *ctx_new);
+
 
 /* Fonctions utilitaires */
 pid_t Allouer_Pid() {
     // Recherche d'un PID disponible
     for (pid_t i = 0; i < NB_PROC; i++) {
-        if (process_table[i] == NULL) { // Considere 0 comme PID invalide/non utilise car c'est celui de l'ID du noyau
+        // Check if this process slot is unused (state will be 0/ELU by default for unused slots)
+        if (i > 0 && process_table[i].pid == 0) { // Skip PID 0 as it's reserved for kernel
             return i;
         }
     }
@@ -49,7 +49,7 @@ pid_t getppid(pid_t pid) {
     // Renvoie le PID du processus parent
     // Implementation specifique a la gestion des processus
     if (pid > 0) {
-        return process_table[pid]->ppid; // Renvoie le PID du parent
+        return process_table[pid].ppid; // Renvoie le PID du parent
     }
     if (pid == 0) {
         return 0; // Renvoie le PID du processus lui-meme car 0 est le PID du noyau
@@ -85,44 +85,40 @@ pid_t create(void * program, char * name) {
         shutdown(1); // Shutdown if no PID available
     }
     
-    // Use the pre-allocated process structure
-    struct process_t *new_process = &process_entities[pid];
-    
-    // Initialize the process
-    new_process->name = name;
-    new_process->priority = nb_ready_active_process;
-    new_process->pid = pid;
-    new_process->ppid = current_process ? current_process->pid : 0;
-    new_process->stack = init_stack(pid);
-    new_process->state = PRET_SUSPENDU;
-    new_process->resources = init_resources(pid);
+    // Initialize the process in the process table directly
+    process_table[pid].name = name;
+    process_table[pid].priority = nb_ready_active_process;
+    process_table[pid].pid = pid;
+    process_table[pid].ppid = current_process ? current_process->pid : 0;
+    process_table[pid].stack = init_stack(pid);
+    process_table[pid].state = PRET_SUSPENDU;
+    process_table[pid].resources = init_resources(pid);
     
     // Calculate stack top (end of the array)
-    void *stack_top = (void*)((uint32_t)new_process->stack + STACK_SIZE * sizeof(uint32_t) - sizeof(uint32_t));
-    // void *stack_top = (void*)((uint32_t)new_process->stack + (STACK_SIZE - 1) * sizeof(uint32_t));
+    void *stack_top = (void*)((uint32_t)process_table[pid].stack + STACK_SIZE * sizeof(uint32_t) - sizeof(uint32_t));
+    // void *stack_top = (void*)((uint32_t)process_table[pid].stack + (STACK_SIZE - 1) * sizeof(uint32_t));
     // printf("Stack top for PID %d: %x\n", pid, (uint32_t)stack_top);
-    // printf("Stack bottom for PID %d: %x\n", pid, (uint32_t)new_process->stack);
+    // printf("Stack bottom for PID %d: %x\n", pid, (uint32_t)process_table[pid].stack);
     // Put the program pointer at the top of the stack
 
     *(uint32_t*)stack_top = (uint32_t)program;
 
     // Fix: properly access the stack array as uint32_t array
-    // uint32_t *stack_array = (uint32_t *)new_process->stack;
+    // uint32_t *stack_array = (uint32_t *)process_table[pid].stack;
     // stack_array[STACK_SIZE - 1] = (uint32_t)program; // Set the program pointer at the top of the stack
     
     // Initialize context directly in the process structure (no temporary context needed)
-    new_process->context.s.ebx = 0;
-    new_process->context.s.esp = (uint32_t)stack_top;
-    // new_process->context.s.esp = (uint32_t)&stack_array[STACK_SIZE - 1];
-    new_process->context.s.ebp = 0;
-    new_process->context.s.esi = 0;
-    new_process->context.s.edi = 0;
+    process_table[pid].context.s.ebx = 0;
+    process_table[pid].context.s.esp = (uint32_t)stack_top;
+    // process_table[pid].context.s.esp = (uint32_t)&stack_array[STACK_SIZE - 1];
+    process_table[pid].context.s.ebp = 0;
+    process_table[pid].context.s.esi = 0;
+    process_table[pid].context.s.edi = 0;
     // Initialiser les flags avec interruptions activées (IF=1, bit 9)
     // 0x200 est le bit IF (Interrupt Flag)
-    new_process->context.s.eflags = 0x200;
+    process_table[pid].context.s.eflags = 0x200;
     
-    // Set the process in the process table
-    process_table[pid] = new_process;
+    // Process is already initialized in the process table
     
     return pid;
 }
@@ -134,7 +130,7 @@ void addProcess(pid_t pid) {
     int insert_pos = -1;
     
     // Priorite du processus a ajouter
-    uint32_t new_priority = process_table[pid]->priority;
+    uint32_t new_priority = process_table[pid].priority;
 
     /* 
     J'ai choisis d'utiliser un tri par insertion pour maintenir la liste triee
@@ -186,7 +182,7 @@ void addProcess(pid_t pid) {
     }
     
     // 4. Inserer le processus a la position trouvee
-    ready_active_process[insert_pos] = process_table[pid];
+    ready_active_process[insert_pos] = &process_table[pid];
     nb_ready_active_process++;
 }
 
@@ -254,6 +250,7 @@ void schedule() {
         current_process_duration = 0;
         return;
     }
+    
     // In fact, we should used another function if the state is TERMINE to liberate the resources like the regs array
     else if (current_process->state != ELU || current_process->priority >= next_process->priority) {
         // printfk("==SWITCHING==\n");
@@ -261,8 +258,42 @@ void schedule() {
         // Save old process info before the switch
         pid_t old_pid = current_process->pid;
         
-        // Skip adding terminated processes back to the ready queue
-        if (current_process->state == ELU) {
+        // Special handling for terminated processes - immediately clean them up
+        if (current_process->state == TERMINE) {
+            // Make a local copy of the context registers we need for switching
+            stack_context_t old_context;
+            // Only copy the registers needed for context switch
+            old_context = current_process->context;
+            
+            // Free the process resources completely
+            // Clear resources array
+            for (int i = 0; i < MAX_RESOURCES; i++) {
+                process_resources[old_pid][i] = 0;
+            }
+            
+            // Reset process table entry
+            process_table[old_pid].pid = 0;
+            
+            // Remove the new process from the ready queue
+            removeProcess(next_process->pid);
+            
+            // Update the state of the new process
+            next_process->state = ELU;
+            next_process->priority = nb_ready_active_process;
+            
+            // Update current process to the new one
+            current_process = next_process;
+            
+            // Reset duration counter
+            current_process_duration = 0;
+            // CRITICAL: Unlock scheduler before context switch
+            schedule_locked = false;
+            
+            // Use the copied context for the switch
+            ctx_sw(old_context.regs, current_process->context.regs);
+        }
+        // Normal case: process is not terminated
+        else if (current_process->state == ELU) {
             // We stop the current process
             current_process->state = PRET_ACTIF; // Set the state to ready
             
@@ -276,39 +307,57 @@ void schedule() {
             
             // Add the current process back to the ready queue
             addProcess(old_pid);
-        }
+            
+            // Remove the new process from the ready queue
+            removeProcess(next_process->pid);
 
-        // Remove the new process from the ready queue
-        removeProcess(next_process->pid);
+            // Update the state of the new process
+            next_process->state = ELU;
+            next_process->priority = nb_ready_active_process;
 
-        // Update the state of the new process
-        next_process->state = ELU;
-        next_process->priority = nb_ready_active_process;
-
-        // Update current process to the new one
-        current_process = next_process;
-        
-        // Update priorities of remaining processes in ready queue
-        for (int i = 0; i < NB_PROC; i++) {
-            if (ready_active_process[i] != NULL) {
-                // Priority 0 is reserved for waking up processes or to start a process directly
-                if (ready_active_process[i]->priority > 1) {
-                    ready_active_process[i]->priority--;
+            // Update current process to the new one
+            current_process = next_process;
+            
+            // Update priorities of remaining processes in ready queue
+            for (int i = 0; i < NB_PROC; i++) {
+                if (ready_active_process[i] != NULL) {
+                    // Priority 0 is reserved for waking up processes or to start a process directly
+                    if (ready_active_process[i]->priority > 1) {
+                        ready_active_process[i]->priority--;
+                    }
+                } else {
+                    break; // No more processes to handle
                 }
-            } else {
-                break; // No more processes to handle
             }
+            
+            // Reset duration counter
+            current_process_duration = 0;
+            // CRITICAL: Unlock scheduler before context switch
+            schedule_locked = false;
+                    
+            // This is the point of no return - after this the function will not continue
+            ctx_sw((process_table[old_pid].context.regs), (process_table[next_process->pid].context.regs));
         }
-        
-        // printfk("Switching from PID=%d to PID=%d\n", old_pid, next_process->pid);
-        
-        // Reset duration counter
-        current_process_duration = 0;
-        // CRITICAL: Unlock scheduler before context switch
-        schedule_locked = false;
-                
-        // This is the point of no return - after this the function will not continue
-        ctx_sw((process_table[old_pid]->context.regs), (process_table[next_process->pid]->context.regs));
+        // Other cases (blocked, suspended)
+        else {
+            // Remove the new process from the ready queue
+            removeProcess(next_process->pid);
+
+            // Update the state of the new process
+            next_process->state = ELU;
+            next_process->priority = nb_ready_active_process;
+
+            // Update current process to the new one
+            current_process = next_process;
+            
+            // Reset duration counter
+            current_process_duration = 0;
+            // CRITICAL: Unlock scheduler before context switch
+            schedule_locked = false;
+            
+            // This is the point of no return - after this the function will not continue
+            ctx_sw((process_table[old_pid].context.regs), (process_table[next_process->pid].context.regs));
+        }
         // Code below this point will only execute when this process is switched back to
         // printfk("Resumed execution of process %d\n", getpid());
     } else {
@@ -323,9 +372,9 @@ void schedule() {
 /* Arret du processus - passage de l'etat elu a pret actif */
 void arreter() {
     pid_t pid = getpid();
-    if (process_table[pid]->state == ELU) {
+    if (process_table[pid].state == ELU) {
         // On le passe de l'etat ELU a PRET_ACTIF
-        process_table[pid]->state = PRET_ACTIF;
+        process_table[pid].state = PRET_ACTIF;
         // On ajoute le processus en cours d'execution a la liste des processus actifs
         addProcess(pid);
 
@@ -336,37 +385,37 @@ void arreter() {
 
 /* Activation du processus - passage de l'etat suspendu a actif */
 void activer(pid_t pid) {
-    // printfk("Activating process with PID=%d, current state: %d\n", pid, process_table[pid]->state);
-    if (process_table[pid]->state == PRET_SUSPENDU) {
-        process_table[pid]->state = PRET_ACTIF;
+    // printfk("Activating process with PID=%d, current state: %d\n", pid, process_table[pid].state);
+    if (process_table[pid].state == PRET_SUSPENDU) {
+        process_table[pid].state = PRET_ACTIF;
         addProcess(pid);
         // printfk("Process PID=%d activated and added to ready queue\n", pid);
     }
-    else if (process_table[pid]->state == BLOQUE_SUSPENDU) {
-        process_table[pid]->state = BLOQUE_ACTIF;
+    else if (process_table[pid].state == BLOQUE_SUSPENDU) {
+        process_table[pid].state = BLOQUE_ACTIF;
         // Pas besoin d'ajouter a la file des ressources car deja fait lors du blocage
         // printfk("Process PID=%d activated but still blocked on resources\n", pid);
     } else {
-        // printfk("Process PID=%d already active, state=%d\n", pid, process_table[pid]->state);
+        // printfk("Process PID=%d already active, state=%d\n", pid, process_table[pid].state);
     }
 }
 
 /* Suspension du processus - passage de l'etat actif a suspendu */
 void suspendre(pid_t pid) {
-    if (process_table[pid]->state == ELU) {
-        process_table[pid]->state = PRET_SUSPENDU;
+    if (process_table[pid].state == ELU) {
+        process_table[pid].state = PRET_SUSPENDU;
         schedule(); // Appeler le schedule pour elire un nouveau processus
     }
-    else if (process_table[pid]->state == PRET_ACTIF) {
-        process_table[pid]->state = PRET_SUSPENDU;
+    else if (process_table[pid].state == PRET_ACTIF) {
+        process_table[pid].state = PRET_SUSPENDU;
         removeProcess(pid);
     }
-    else if (process_table[pid]->state == BLOQUE_ACTIF) {
-        process_table[pid]->state = BLOQUE_SUSPENDU;
+    else if (process_table[pid].state == BLOQUE_ACTIF) {
+        process_table[pid].state = BLOQUE_SUSPENDU;
         // Le processus quitte la file d'attente des ressources
         for (int i = 0; i < MAX_RESOURCES; i++) {
-            if (process_table[pid]->resources[i] != 0) {
-                removeResource(process_table[pid]->resources[i], pid);
+            if (process_table[pid].resources[i] != 0) {
+                removeResource(process_table[pid].resources[i], pid);
             }
         }
     }
@@ -381,8 +430,8 @@ void suspendre(pid_t pid) {
 void bloquer(RESOURCE_ID rid) {
     // On recupere le pid du processus en cours
     pid_t pid = getpid();
-    if (process_table[pid]->state == ELU) {
-        process_table[pid]->state = BLOQUE_ACTIF;
+    if (process_table[pid].state == ELU) {
+        process_table[pid].state = BLOQUE_ACTIF;
         // On l'ajoute dans la file d'attente de la ressource bloquante
         addResource(rid, pid);
 
@@ -393,9 +442,9 @@ void bloquer(RESOURCE_ID rid) {
 
 /* Deblocage du processus d'une ressource */
 void debloquer(pid_t pid, RESOURCE_ID rid) {
-    if (process_table[pid]->state == BLOQUE_ACTIF) {
+    if (process_table[pid].state == BLOQUE_ACTIF) {
         // On change l'etat du processus
-        process_table[pid]->state = PRET_ACTIF;
+        process_table[pid].state = PRET_ACTIF;
         // On supprime le processus de la file d'attente de la ressource
         removeResource(rid, pid);
         // On ajoute le processus a la file des processus prets
@@ -403,9 +452,9 @@ void debloquer(pid_t pid, RESOURCE_ID rid) {
         // On verifie si le processus debloque est plus prioritaire que le processus en cours
         schedule();
     }
-    else if (process_table[pid]->state == BLOQUE_SUSPENDU) {
+    else if (process_table[pid].state == BLOQUE_SUSPENDU) {
         // On change l'etat du processus
-        process_table[pid]->state = PRET_SUSPENDU;
+        process_table[pid].state = PRET_SUSPENDU;
         // On supprime le processus de la file d'attente de la ressource
         removeResource(rid, pid);
         // Le processus est suspendu, il n'est pas ajoute a la file des processus prets
@@ -416,36 +465,41 @@ void debloquer(pid_t pid, RESOURCE_ID rid) {
 void terminer(pid_t pid) {
     schedule_locked = true; // Verrouille le planificateur pour eviter les interruptions
     
+    // Protection against terminating the idle process (PID 0)
+    if (pid == 0) {
+        // printfk("Cannot terminate the idle process (PID 0)\n");
+        schedule_locked = false; // Deverrouille le planificateur
+        return;
+    }
+    
     // On verifie si le processus existe dans la table
-    if (process_table[pid] != NULL) {
+    if (process_table[pid].pid != 0) {
         // On verifie si le processus est en cours d'execution
-        struct process_t * process_to_terminate = process_table[pid];
-        if (process_to_terminate->state == ELU) {
-            // On debloque toutes les ressources utilisees par le processus
-            for (int i = 0; i < MAX_RESOURCES; i++) {
-                if (process_to_terminate->resources[i] != 0) {
-                    removeResource(process_to_terminate->resources[i], process_to_terminate->pid);
-                }
-            }
-        } else if (process_to_terminate->state == PRET_ACTIF) {
-            // On le retire de la file d'attente des processus prets
-            removeProcess(pid);
-        } else if (process_to_terminate->state == BLOQUE_ACTIF) {
-            // On le retire de la file d'attente des ressources
-            for (int i = 0; i < MAX_RESOURCES; i++) {
-                if (process_to_terminate->resources[i] != 0) {
-                    removeResource(process_to_terminate->resources[i], process_to_terminate->pid);
-                }
+        struct process_t * process_to_terminate = &process_table[pid];
+        
+        // Clean up resources regardless of the state
+        for (int i = 0; i < MAX_RESOURCES; i++) {
+            if (process_to_terminate->resources[i] != 0) {
+                removeResource(process_to_terminate->resources[i], process_to_terminate->pid);
             }
         }
+        
+        // Handle based on current state
+        if (process_to_terminate->state == PRET_ACTIF) {
+            // On le retire de la file d'attente des processus prets
+            removeProcess(pid);
+        }
+        
+        // Mark as terminated (actual cleanup now happens during next context switch)
         process_to_terminate->state = TERMINE;
-        // printfk("Processus %d termine\n", pid);
-        if (process_table[pid]->ppid > 0) {
+        
+        if (process_table[pid].ppid > 0) {
             // On debloque le parent du processus termine
-            activer(process_table[pid]->ppid);
-        } else {
-            // printfk("Processus %d n'a pas de parent\n", pid);
-            // On appelle le schedule pour elire un nouveau processus
+            activer(process_table[pid].ppid);
+        }
+        
+        // If the terminated process is the currently running one, schedule a new one
+        if (process_to_terminate->state == ELU || current_process == process_to_terminate) {
             schedule();
         }
     } else {
@@ -473,10 +527,10 @@ void addResource(RESOURCE_ID rid, pid_t pid) {
 void removeResource (RESOURCE_ID rid , pid_t pid ) {
     // Supprime le processus pid de la file d'attente de la ressource rid
     // Implementation specifique a la gestion des ressources
-    if (process_table[pid]->resources != NULL) {
+    if (process_table[pid].resources != NULL) {
         for (int i = 0; i < MAX_RESOURCES; i++) {
-            if (process_table[pid]->resources[i] == rid) { // Trouve la ressource a supprimer
-                process_table[pid]->resources[i] = 0; // Supprime la ressource
+            if (process_table[pid].resources[i] == rid) { // Trouve la ressource a supprimer
+                process_table[pid].resources[i] = 0; // Supprime la ressource
                 break;
             }
         }
@@ -484,19 +538,22 @@ void removeResource (RESOURCE_ID rid , pid_t pid ) {
 }
 
 void liberer_processus(pid_t pid) {
-    // No need to free memory with static arrays, just mark the process as unused
-    if (process_table[pid] != NULL) {
-        // Make sure the process is actually terminated
-        if (process_table[pid]->state == TERMINE) {
-            // Make sure we're not trying to free the current process
-            if (current_process != process_table[pid]) {
-                // Clear resources array (not strictly necessary but good practice)
+    // This function is now obsolete as terminated processes are automatically cleaned up
+    // by the scheduler during context switching. However, it's kept for backward compatibility.
+    printfk("Warning: Fonction liberer_processus() est maintenant obsolète. Les processus terminés\n");
+    printfk("sont automatiquement libérés par l'ordonnanceur lors du changement de contexte.\n");
+    
+    // In case it's still called somewhere, perform the cleanup
+    if (process_table[pid].pid != 0) {
+        if (process_table[pid].state == TERMINE) {
+            if (current_process != &process_table[pid]) {
+                // Clear resources array
                 for (int i = 0; i < MAX_RESOURCES; i++) {
                     process_resources[pid][i] = 0;
                 }
                 
-                // Remove from process table
-                process_table[pid] = NULL;
+                // Reset process table entry
+                process_table[pid].pid = 0;
             }
         }
     }
@@ -531,7 +588,7 @@ void display_scheduler_state() {
     // Just count existing processes without detailed printing
     int existing_count = 0;
     for (int i = 0; i < NB_PROC; i++) {
-        if (process_table[i] != NULL) {
+        if (process_table[i].pid != 0) {
             existing_count++;
         }
     }
@@ -560,9 +617,9 @@ void display_scheduler_state() {
 
 void wakeup_process(pid_t pid) {
     // Wake up a suspended process
-    if (process_table[pid] != NULL) {
-        process_table[pid]->state = PRET_ACTIF; // Change state to ready
-        process_table[pid]->priority = 0; // Set priority to the highest
+    if (process_table[pid].pid != 0) {
+        process_table[pid].state = PRET_ACTIF; // Change state to ready
+        process_table[pid].priority = 0; // Set priority to the highest
         addProcess(pid); // Add to the ready queue (Should be first in line)
     } else {
         printfk("Processus %d non trouve\n", pid);
@@ -571,8 +628,8 @@ void wakeup_process(pid_t pid) {
 
 void rename_process(pid_t pid, char *name) {
     // Renomme le processus avec le PID donne
-    if (process_table[pid] != NULL) {
-        process_table[pid]->name = name;
+    if (process_table[pid].pid != 0) {
+        process_table[pid].name = name;
     } else {
         printfk("Processus %d non trouve\n", pid);
     }
@@ -586,7 +643,7 @@ void dummy_process() {
     }
 }
 
-pid_t resume_process() {
-    // Reprise normale après un fork
+pid_t resume_child_process() {
+    // Reprise normale après un fork chez le processus fils
     return 0; // Return 0 to know it's the child process
 }

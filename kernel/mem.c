@@ -19,6 +19,7 @@ void setPage(uint32_t adresse) {
         return;
     }
     
+    // On récupère l'index global de la page à partir de l'adresse
     uint32_t index_global = adresse / PAGE_SIZE;
 
     // On divise l'index_global par 32 pour obtenir l'index de la page

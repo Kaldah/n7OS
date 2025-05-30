@@ -64,5 +64,8 @@ int fork(void);
 int get_pid(void);
 int exit(void);
 int sleep(int seconds);
+int spawn(void *entry_point, const char *name);
+int sys_execve(const char *filename, char *const argv[], char *const envp[]);
+int vfork(void);
 
 #endif

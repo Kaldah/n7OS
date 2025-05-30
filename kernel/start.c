@@ -19,51 +19,54 @@
 #include <n7OS/mini_shell.h>
 
 extern void processus1();
+extern void processus2();
 extern void mini_shell_process();
 
 void idle() {
     // code de idle
     printf("Idle process started\n");
 
-    printf("Processus pere en cours d'exécution...\n");
+    printf("Processus pere en cours d'execution...\n");
     printf("PID du processus pere : %d\n", getpid());
 
-    // Démarrer le processus normal
-    pid_t pidfils = spawn(processus1, "Processus 1");
+    // Démarrer le processus 1 avec un spawn
+    int pidfils = spawn(processus1, "Processus 1");
     if (pidfils == -1) {
-        printf("Erreur lors de la création du processus fils\n");
+        printf("Erreur lors de la creation du processus fils\n");
     } else {
         printf("Processus fils cree avec PID %d\n", pidfils);
-        activer(pidfils);
+    }
+
+    // Démarrer le processus 2 avec un spawn
+    pidfils = spawn(processus2, "Processus 2");
+    if (pidfils == -1) {
+        printf("Erreur lors de la creation du processus fils\n");
+    } else {
+        printf("Processus fils cree avec PID %d\n", pidfils);
     }
     
-    // Démarrer le mini-shell comme un processus
-    pid_t shell_pid = spawn(mini_shell_process, "Mini-Shell");
+    // Attendre 5 secondes pour que les processus 1 et 2 finissent d'afficher des choses
+    // A but visuel
+    sleep(4);
+    // Demarrer le mini-shell dans un processus
+    int shell_pid = spawn(mini_shell_process, "Mini-Shell");
     if (shell_pid == -1) {
-        printf("Erreur lors de la création du processus mini-shell\n");
+        printf("Erreur lors de la creation du processus mini-shell\n");
     } else {
-        printf("Mini-shell démarré avec PID %d\n", shell_pid);
-        activer(shell_pid);
+        printf("Mini-shell demarre avec PID %d\n", shell_pid);
     }
-
-    // Démo vfork (conservée pour démonstratio)
-    pid_t v = vfork();
-    if (v == 0) {
-        // je suis l'enfant
-        execve(processus1);
-    } else {
-        // je suis le parent, j'attends que l'enfant exec/exit
-        printf("Je suis le parent du processus %d\n", v);
-    }
-
 
 
     while (1) {
         hlt(); // Met le CPU en attente
+        // TODO: Implanter une verification du minishell
+        // Proposer de la relancer s'il est éteint
+        // en testant l'input d'une touche
+        // utiliser le shell_pid pour voir son état
     }
 
     // Ne doit jamais sortir de idle
-    terminer(getpid()); // Termine le processus
+    exit();
 }
 
 
@@ -71,13 +74,14 @@ void kernel_start(void)
 {
     init_console();
 
-    // printf("===Initialisation de la mémoire===\n");
+    // printfk("===Initialisation de la memoire===\n");
 
     kmalloc_init();
 
-    // printf("===Initialisation de la pagination===\n");
+    // printfk("===Initialisation de la pagination===\n");
     uint32_t page_directory = (uint32_t) initialise_paging();
     
+
     setup_base(page_directory);
     // print_mem(4096);
 
@@ -87,7 +91,7 @@ void kernel_start(void)
     // uint32_t do_page_fault = *test;
     // do_page_fault ++;
     
-    // Initialisation des appels systèmes
+    // Initialisation des appels systemes
     init_syscall();
 
     // initialisation de l'horloge
@@ -100,21 +104,21 @@ void kernel_start(void)
     sti();
 
     // Create the idle process first
-    printf("Création du processus Idle\n");
+    printf("Creation du processus Idle\n");
     pid_t pidmain = create(idle, "Idle process");
     
     // Set the idle process as active
     activer(pidmain);
 
     if (example() == 1) {
-        printf("=== Appel système example réussi ===\n");
+        printf("=== Appel systeme example reussi ===\n");
     } else {
-        printf("=== Appel système example échoué ===\n");
+        printf("=== Appel systeme example echoue ===\n");
     }
 
     schedule();
 
-    // Start the idle process
+    // Start the idle process who manages everything from this point
     idle();
 
     // This should never be reached

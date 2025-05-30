@@ -13,7 +13,9 @@
 
 extern void handler_IT_TIMER();
 
-uint32_t time = 0;
+uint32_t time = 0; // Variable to keep track of the system time in milliseconds
+
+// Table to store wake-up times for suspended processes to know when to wake them up after a sleep
 uint32_t suspended_process_wakeup_time[NB_PROC]; // Wake up time for suspended processes
 
 // initialise la ligne num_line avec le traitant handler
@@ -47,10 +49,7 @@ void handler_en_C_TIMER() {
     }
 
     if (!schedule_locked && current_process != NULL) current_process_duration++;
-    if (current_process_duration >= TIME_SLOT) {
-        // Trigger process scheduling when time slot has expired
-        handle_scheduling_IT();
-    }
+    
     // Check if any suspended processes need to be activated
     for (int i = 0; i < NB_PROC; i++) {
         if (suspended_process_wakeup_time[i] != 0 && suspended_process_wakeup_time[i] <= get_time()) {
@@ -59,7 +58,10 @@ void handler_en_C_TIMER() {
             wakeup_process((pid_t) i);
         }
     }
-
+    if (current_process_duration >= TIME_SLOT) {
+        // Trigger process scheduling when time slot has expired
+        handle_scheduling_IT();
+    }
 }
 
 uint32_t get_time() {

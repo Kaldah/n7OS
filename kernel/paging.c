@@ -11,16 +11,19 @@
 PageDirectory page_directory;
 int32_t compteur_pages = 0;
 
+// Fonction pour charger le répertoire de pages dans le registre CR3
 void loadPageDirectory(PageDirectory page_directory) {
     __asm__ __volatile__("mov %0, %%cr3":: "r"(page_directory));
 }
 
+// Fonction pour lire le registre CR3
 uint32_t lire_cr3() {
     uint32_t cr3;
     __asm__ __volatile__("mov %%cr3, %0": "=r"(cr3));
     return cr3;
 }
 
+// Fonction pour activer la pagination en modifiant le registre CR0
 void enablePaging() {
     uint32_t cr0;
     __asm__ __volatile__("mov %%cr0, %0" : "=r"(cr0));
@@ -28,12 +31,14 @@ void enablePaging() {
     __asm__ __volatile__("mov %0, %%cr0":: "r"(cr0));
 }
 
+// Fonction pour lire le registre CR0
 uint32_t lire_cr0() {
     uint32_t cr0;
     __asm__ __volatile__("mov %%cr0, %0": "=r"(cr0));
     return cr0;
 }
 
+// Fonction pour définir une entrée de page dans la table de pages
 void setPageEntry(PTE *page_table_entry, uint32_t new_page, int is_writeable, int is_kernel) {
     page_table_entry->page_entry.P = 1;
     page_table_entry->page_entry.A = 0;
@@ -43,6 +48,7 @@ void setPageEntry(PTE *page_table_entry, uint32_t new_page, int is_writeable, in
     page_table_entry->page_entry.page= new_page>>12;
 }
 
+// Fonction pour initialiser la pagination et créer le répertoire de pages
 PageDirectory initialise_paging() {
 
     uint32_t last_index = 0;
@@ -97,10 +103,11 @@ PageDirectory initialise_paging() {
     return page_directory;
 }
 
+// Fonction pour trouver une page libre dans la mémoire physique
 PageTable alloc_page_entry(uint32_t address, int is_writeable, int is_kernel) {
-    // address = adresse virtuelle à allouer 
-    // address = idx_PDE | idx_PTE | offset
-    //             10    |    10   |   12
+    // address = adresse virtuelle à allouer
+    // address = idx_PDE | idx_PTE | offset
+    // 10 | 10 | 12
 
     // On garde les 10 premiers bits
     int idx_pagedir = (address >> 22); // calcul de la position de la table de page dans le répertoire de page
@@ -122,7 +129,8 @@ PageTable alloc_page_entry(uint32_t address, int is_writeable, int is_kernel) {
         compteur_pages++;
         //printfk("Page allouée : %x\n", phy_page);
     }
-
+    
+    // On marque la page comme occupée dans le bitmap
     int idx_pagetab = (0x3ff & (address >> 12)); // calcul de la position de la page dans la table de page
     
     // mise a jour de l'entree dans la page de table

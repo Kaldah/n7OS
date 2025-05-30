@@ -16,6 +16,8 @@
 extern void print_mem(uint32_t nb_pages);
 
 // Mise à jour d'une variable globale pour le mode utilisateur, utilisée par user_mode.h
+// Déclaration de la table des processus
+extern struct process_t process_table[NB_PROC];
 int mini_shell_active = 0;
 
 // Configuration du mini-shell
@@ -96,8 +98,9 @@ void mini_shell_process(void) {
     printfk("\n****************************************\n");
     printfk("* Mini-Shell n7OS v1.0                *\n");
     printfk("* Tapez 'help' pour la liste des commandes *\n");
+    printfk("* ESC pour quitter le mini-shell      *\n");
     printfk("****************************************\n");
-    printfk("Commandes disponibles: help, clear, version, ps, meminfo, uptime, kinfo, exit\n\n");
+    printfk("Commandes disponibles: help, clear, version, ps, meminfo, uptime, kinfo, pkill\n\n");
     
     // Boucle principale - dans un vrai système, on attendrait des événements clavier
     // Dans notre cas, les entrées seront traitées par les gestionnaires d'interruption clavier
@@ -136,6 +139,11 @@ void mini_shell_process_key(char c) {
                 // Si on est à la fin du buffer
                 shell_ctx.buffer_len--;
                 shell_ctx.buffer_pos--;
+                
+                // Enlever la surbrillance du caractère actuel avant de se déplacer
+                uint16_t old_pos = shell_ctx.position;
+                scr_tab[old_pos] = CHAR_COLOR << 8 | (scr_tab[old_pos] & 0x00FF);
+                
                 shell_ctx.position--;
                 
                 // Effacer le caractère à l'écran
@@ -374,50 +382,49 @@ static void parse_args(char *cmd, char *args[], int *argc) {
 
 // Function to display process list in a Linux-like format
 static void shell_cmd_ps(void) {
-    extern struct process_t *process_table[NB_PROC];
+    extern struct process_t process_table[NB_PROC];
     extern struct process_t *current_process;
-    extern struct process_t *ready_active_process[NB_PROC];
-    extern uint32_t time; // System uptime in milliseconds
     int total_procs = 0;
     
     // Print header similar to Linux ps command with additional info
-    printfk("\n%-5s %-5s %-8s %-6s %-5s %s\n", 
+    printfk("\n%-5s %-5s %-12s %-6s %-5s %s\n", 
            "PID", "PPID", "STATE", "PRIO", "ADDR", "NAME");
-    printfk("------ ------ --------- ------ ------ ----------------\n");
+    printfk("------ ------ ------------- ------ ------ ----------------\n");
     
     // Iterate through process table
     for (int i = 0; i < NB_PROC; i++) {
-        if (process_table[i] != NULL) {
+        // Show processes with valid PIDs
+        if (process_table[i].pid != 0) {
             total_procs++;
             const char *state_str;
-            char state_char = '?';
             
-            // State character (similar to Linux ps)
-            switch (process_table[i]->state) {
-                case ELU:             state_str = "running"; state_char = 'R'; break;
-                case PRET_ACTIF:      state_str = "ready";   state_char = 'S'; break;
-                case PRET_SUSPENDU:   state_str = "sleep";   state_char = 'S'; break;
-                case BLOQUE_ACTIF:    state_str = "blocked"; state_char = 'D'; break;
-                case BLOQUE_SUSPENDU: state_str = "bsusp";   state_char = 'T'; break;
-                case TERMINE:         state_str = "zombie";  state_char = 'Z'; break;
-                default:              state_str = "???";     state_char = '?'; break;
+            // Use full descriptive state names for better readability
+            switch (process_table[i].state) {
+                case ELU:             state_str = "RUNNING"; break;
+                case PRET_ACTIF:      state_str = "READY"; break;
+                case PRET_SUSPENDU:   state_str = "SLEEPING"; break;
+                case BLOQUE_ACTIF:    state_str = "BLOCKED"; break;
+                case BLOQUE_SUSPENDU: state_str = "BLK+SUSP"; break;
+                case TERMINE:         state_str = "ZOMBIE"; break;
+                default:              state_str = "UNKNOWN"; break;
             }
             
             // Check if this process is the current one
-            char current_mark = (current_process && process_table[i]->pid == current_process->pid) ? '*' : ' ';
+            char current_mark = (current_process && process_table[i].pid == current_process->pid) ? '*' : ' ';
             
             // Calculate stack address (for info)
-            uint32_t stack_addr = (uint32_t)process_table[i]->stack;
+            uint32_t stack_addr = (uint32_t)process_table[i].stack;
             
-            // Print process info (Linux-style format)
-            printfk("%4d%c %-5d %-8c %-6d 0x%04x %s\n",
-                   process_table[i]->pid,
+            // Print process info with descriptive state name
+            printfk("%4d%c %-5d %-12s %-6d 0x%04x %s%s\n",
+                   process_table[i].pid,
                    current_mark,
-                   process_table[i]->ppid,
-                   state_char,
-                   process_table[i]->priority,
+                   process_table[i].ppid,
+                   state_str,
+                   process_table[i].priority,
                    stack_addr & 0xFFFF, // Show only last 4 hex digits
-                   process_table[i]->name ? process_table[i]->name : "<unknown>");
+                   process_table[i].name ? process_table[i].name : "<unknown>",
+                   (process_table[i].state == TERMINE) ? " (zombie)" : "");
         }
     }
     
@@ -512,7 +519,7 @@ static void shell_cmd_uptime(void) {
 
 // Function to display kernel information
 static void shell_cmd_kinfo(void) {
-    extern struct process_t *process_table[NB_PROC];
+    extern struct process_t process_table[NB_PROC];
     extern uint32_t nb_ready_active_process;
     
     printfk("=== Informations sur le noyau n7OS ===\n");
@@ -524,12 +531,16 @@ static void shell_cmd_kinfo(void) {
     int zombie_processes = 0;
     
     for (int i = 0; i < NB_PROC; i++) {
-        if (process_table[i] != NULL) {
+        if (process_table[i].pid != 0) {
             total_processes++;
             
-            switch (process_table[i]->state) {
+            switch (process_table[i].state) {
                 case ELU:
                 case PRET_ACTIF:
+                    running_processes++;
+                    break;
+                case PRET_SUSPENDU:
+                    // Count suspended but ready processes as running
                     running_processes++;
                     break;
                 case BLOQUE_ACTIF:
@@ -560,6 +571,8 @@ static void shell_cmd_kinfo(void) {
 #endif
 }
 
+/* Cleanup function removed - processes are now freed automatically by the scheduler */
+
 // Exécute la commande saisie
 static void shell_execute_command(void) {
     char *args[10];  // Max 10 arguments
@@ -583,7 +596,7 @@ static void shell_execute_command(void) {
         printfk("  meminfo [n]    - Affiche l'état de la mémoire (n pages, défaut=128)\n");
         printfk("  uptime         - Affiche le temps écoulé depuis le démarrage\n");
         printfk("  kinfo          - Affiche des informations sur le noyau\n");
-        printfk("  exit           - Quitte le mini-shell\n");
+        printfk("  pkill [pid]    - Termine le processus avec l'ID spécifié\n");
     } else if (strcmp(args[0], "clear") == 0) {
         // Effacer l'écran
         for (int i = 0; i < 25 * 80; i++) {
@@ -612,11 +625,39 @@ static void shell_execute_command(void) {
         shell_cmd_uptime();
     } else if (strcmp(args[0], "kinfo") == 0) {
         shell_cmd_kinfo();
-    } else if (strcmp(args[0], "exit") == 0) {
-        printfk("Sortie du mini-shell. Appuyez sur ESC pour relancer.\n");
-        // Désactiver le mini-shell
-        mini_shell_active = 0;
-        unregister_keyboard_callback(mini_shell_keyboard_handler);
+    } else if (strcmp(args[0], "pkill") == 0) {
+        if (argc < 2) {
+            printfk("Erreur: veuillez spécifier un PID à terminer\n");
+            printfk("Usage: pkill [pid]\n");
+        } else {
+            // Convertir la chaîne en entier
+            pid_t pid = 0;
+            for (int i = 0; args[1][i] != '\0'; i++) {
+                if (args[1][i] >= '0' && args[1][i] <= '9') {
+                    pid = pid * 10 + (args[1][i] - '0');
+                }
+            }
+            
+            // Vérifier que le PID est valide
+            extern struct process_t process_table[NB_PROC];
+            extern pid_t getpid();
+            
+            if (pid <= 0 || pid >= NB_PROC || process_table[pid].pid == 0) {
+                printfk("Erreur: PID %d invalide ou inexistant\n", pid);
+            } else if (pid == 0) {
+                printfk("Erreur: Impossible de terminer le processus idle (PID 0)\n");
+            } else if (pid == getpid()) {
+                printfk("Erreur: Impossible de terminer le shell lui-même\n");
+            } else {
+                extern void terminer(pid_t pid);
+                printfk("Terminaison du processus %d (%s)...\n", 
+                       pid, 
+                       process_table[pid].name ? process_table[pid].name : "<unknown>");
+                terminer(pid);
+                printfk("Processus %d terminé\n", pid);
+            }
+        }
+    /* Exit command removed - user must use ESC key to exit the mini-shell */
     } else if (shell_ctx.buffer_len > 0) {
         printfk("Commande inconnue: %s\n", args[0]);
     }

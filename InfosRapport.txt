@@ -1,0 +1,38 @@
+### Rapport N7OS - Corentin COUSTY
+## Processus
+
+Les processus sont toujours triés par ordre de priorité dans un tableau qui reste constamment trié et il n'y a pas de case vide avant la fin de la liste.
+
+Le mieux aurait été de définir une structure  avec une liste chainée permettant d'insérer le processus où l'on veut en temps O(n) pour éviter des problèmes de temps de copie pour garder le tableau trié.
+
+J'ai aussi décidé d'implanter plus d'états, dont suspendu qui est utilisé lors qu'un processus est en sleep. J'ai aussi ajouté l'état TERMINE pour savoir quand on peut le libérer avant d'effectuer le swt_ctx.
+
+L'ordonnanceur utilise un simple round-robin actuellement mais la structure du code permet de facilement changer l'algorithme et de l'adapter facilement à d'autres types d'algorithme de répartition grâce aux priorités. On pourrait par exemple ajouté un champ "importance" qui donne la priorité de retour dans la file.
+
+Actuellement, la priorité d'entrée dans la liste des processus prêt vaut le nombre de processus pour qu'il s'ajoute à la fin puis à chaque appel du scheduler la priorité des autres processus descend de 1 jusqu'à atteindre 1. La priorité 0 est réservée au réveil d'un processus, lorsqu'on souhaite l'exécuté directement après un tick d'horloge ou en réponse à un événement comme par exemple la terminaison d'un processus fils qui prévient le père. cela permet d'être sûr que le prochain processus exécuté sera celui voulu.
+
+La gestion des ressources est aussi implanté avec l'état BLOQUE mais reste théorique car on ne les utilise pas.
+
+## Mémoire
+
+J'ai choisi d'utiliser la bit-map car elle prend moins d'espace mémoire
+
+## Time
+
+Dans le handler du tick du timer j'ai insérer plusieurs vérification liées au processus comme l'appel du handler lorsque c'est nécessaire.
+
+Il y a aussi un tableau des processus endormi contenant l'heure de réveil des processus, pour mieux optimiser il aurait été mieux d'avoir recours à une liste d'un type pouvant contenir le pid et l'heure de réveil.
+
+Si l'heure de réveil est à 0 alors on sait que le processus n'est pas en sleep.
+
+Dès la fin du sleep le processus courant est stoppé et le processus endormi est réveillé donc il repasse à l'état de processus prêt avec la priorité 0 qui est la priorité réservé aux réveils.
+
+
+## Console
+J'ai choisi de réserver un espace de l'écran qui est automatiquement ignoré pour afficher l'heure.
+J'ai aussi fait des fonctions pour scroller sur l'écran grâce à un historique.
+
+## Bonus
+
+Je pense essayer d'implanter le fork de UNIX pendant les vacances.
+
