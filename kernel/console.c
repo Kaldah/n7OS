@@ -164,31 +164,24 @@ void console_putchar(const char c) {
 }
 
 void console_putbytes(const char *s, int len) {
-    extern int mini_shell_active;  // Add reference to mini_shell state
+
     uint16_t cursor_pos = get_mem_cursor();
 
-    // Only modify highlighting in normal mode
-    if (!mini_shell_active) {
-        // Remove highlight from current cursor position
-        scr_tab[cursor_pos] = CHAR_COLOR << 8 | (scr_tab[cursor_pos] & 0x00FF);
-    }
+    // On retire la surbrillance du charactere du curseur
+    scr_tab[cursor_pos]= CHAR_COLOR << 8 | (scr_tab[cursor_pos] & 0x00FF);
 
-    for (int i = 0; i < len; i++) {
+    for (int i= 0; i<len; i++) {
         console_putchar(s[i]);
     }
 
-    // Update cursor position
+    // la position du curseur a changé, on la remet à jour
     cursor_pos = get_mem_cursor();
 
-    // Only apply highlighting in normal mode
-    if (!mini_shell_active) {
-        // Apply highlight to new cursor position
-        scr_tab[cursor_pos] = (1 << 7|BACK|TEXT) << 8 | (scr_tab[cursor_pos] & 0x00FF);
-    }
+    // On met en surbrillance le charactère du curseur
+    scr_tab[cursor_pos]= (1 << 7|BACK|TEXT) << 8 | (scr_tab[cursor_pos] & 0x00FF);
     
     set_mem_cursor(cursor_pos);
-    
-    // Update time display
+    // Properly use get_time_string() which returns a char* pointer
     char *time_str = get_time_string();
     console_puts_time(time_str);
 }
