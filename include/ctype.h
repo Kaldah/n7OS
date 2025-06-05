@@ -1,10 +1,14 @@
-#ifndef CTYPE_H_
-#define CTYPE_H_
+#ifndef _CTYPE_H_
+#define _CTYPE_H_
 
-static inline int isspace(int c) {
-	return ((c) == ' ') || ((c) == '\f')
-		|| ((c) == '\n') || ((c) == '\r')
-		|| ((c) == '\t') || ((c) == '\v');
-}
+int isspace(int c);
+int isdigit(int c);
+int isalpha(int c);
+int isalnum(int c);
+int isupper(int c);
+int islower(int c);
+int isxdigit(int c);
+int tolower(int c);
+int toupper(int c);
 
-#endif /*CTYPE_H_*/
+#endif /*_CTYPE_H_*/

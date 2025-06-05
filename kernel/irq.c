@@ -1,6 +1,6 @@
 #include <inttypes.h>
 #include <n7OS/irq.h>
-#include <n7OS/printk.h> // Add for printfk function
+#include <n7OS/printk.h>
 #include <unistd.h>
 
 // initialise la ligne num_line avec le traitant handler
